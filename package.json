@@ -1,0 +1,13 @@
+{
+  "name": "ast-trader",
+  "version": "0.1.0",
+  "description": "빗썸 API 기반 코인 자동매매 (판단 점수 + 손절가·목표가 관리)",
+  "type": "module",
+  "private": true,
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "start": "node src/index.js",
+    "backtest": "node src/cli/backtest.js",
+    "test": "node --test test/"
+  }
+}
