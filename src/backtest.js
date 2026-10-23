@@ -34,7 +34,8 @@ export async function loadBacktestData(client, cfg, count) {
 // - 신호는 봉 마감 후 계산하고 다음 봉 시가에 매수 (미래 데이터 참조 없음)
 // - 봉 안의 순서는 보수적으로: 시가 갭 → 손절가(저가) → 목표가(고가)
 // - 국면 필터: 신호 봉 마감 시각에 BTC가 하락 국면이면 진입하지 않음
-export function backtest(d, cfg, { capital = cfg.paperKrw, btc = null } = {}) {
+// - signalFrom: 이 인덱스 이전 봉의 신호는 무시 (리플레이 검증과 시작점을 맞출 때)
+export function backtest(d, cfg, { capital = cfg.paperKrw, btc = null, signalFrom = 0 } = {}) {
   const n = d.length, unitMs = cfg.unit * 60e3;
   const strategy = getStrategy(cfg.strategy);
   if (cfg.regimeFilter === 'btc' && !btc && !isBtc(cfg.market)) throw new Error('국면 필터에 쓸 BTC 시세가 필요합니다 (loadBacktestData 사용)');
@@ -78,8 +79,11 @@ export function backtest(d, cfg, { capital = cfg.paperKrw, btc = null } = {}) {
       if (b.o <= pos.stop) sell(i, b.o, priceAction(pos, b.o, cfg));
       else if (b.l <= pos.stop) sell(i, pos.stop, priceAction(pos, pos.stop, cfg));
       else {
+        const t1Before = pos.t1Done;
         if (!pos.t1Done && b.h >= pos.t1) sell(i, pos.t1, priceAction(pos, pos.t1, cfg));
         if (pos && pos.t1Done && b.h >= pos.t2) sell(i, pos.t2, priceAction(pos, pos.t2, cfg));
+        // 이 봉에서 1차 목표 후 손절가가 본전으로 올라갔고, 고가 이후 종가가 그 아래로 내려왔으면 같은 봉에서 손절
+        if (pos && !t1Before && pos.t1Done && b.c <= pos.stop) sell(i, pos.stop, priceAction(pos, pos.stop, cfg));
       }
     }
     if (pos) {
@@ -89,7 +93,7 @@ export function backtest(d, cfg, { capital = cfg.paperKrw, btc = null } = {}) {
       }, cfg);
     }
     equity[i] = cash + (pos ? pos.qty * b.c * (1 - cfg.fee) : 0);
-    if (!pos && i < n - 1 && sc[i].enter) {
+    if (!pos && i < n - 1 && i >= signalFrom && sc[i].enter) {
       if (bull[i]) pending = { score: sc[i].score, parts: sc[i].parts };
       else skipped.push({ at: b.t, idx: i + 1, reason: 'BTC 하락 국면', score: sc[i].score });
     }

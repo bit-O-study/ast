@@ -23,7 +23,7 @@ export function startHeartbeat({ url, intervalSec = 60, fetchImpl = globalThis.f
 export function createIpWatcher({
   intervalSec = 300,
   sources = ['https://api.ipify.org', 'https://ifconfig.me/ip'],
-  fetchImpl = globalThis.fetch, onChange = (prev, next) => {}, onError = () => {}, timeoutMs = 10000,
+  fetchImpl = globalThis.fetch, onInitial = (ip) => {}, onChange = (prev, next) => {}, onError = () => {}, timeoutMs = 10000,
 }) → { check(): Promise<string|null>, current(): string|null, stop() }
 ```
 
@@ -38,7 +38,7 @@ export function createIpWatcher({
 
 ### IP 감시
 - `sources`를 순서대로 시도해 첫 성공 값을 쓴다. 응답 본문을 다듬어(trim) IPv4/IPv6 형식인지 확인한다.
-- 처음 얻은 값은 기준값으로 저장만 하고 `onChange`는 부르지 않는다.
+- 처음 얻은 값은 기준값으로 저장하고 `onInitial(ip)`을 부른다. `onChange`는 부르지 않는다. (2026-10-23 계약 C7 변경)
 - 이후 값이 바뀌면 `onChange(prev, next)`.
 - 모든 소스 실패 시 `onError`, 기존 값 유지.
 - 타이머는 `unref()`.

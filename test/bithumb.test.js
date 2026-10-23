@@ -73,3 +73,9 @@ test('키 없이 인증 API를 부르면 요청 전에 막는다', async () => {
   const c = new BithumbClient({ fetchImpl: fakeFetch(() => ({ body: [] })) });
   await assert.rejects(c.accounts(), /API 키/);
 });
+
+test('응답이 없으면 타임아웃 오류', async () => {
+  const hang = (url, opt) => new Promise((_, reject) => opt.signal.addEventListener('abort', () => { const e = new Error('aborted'); e.name = 'AbortError'; reject(e); }));
+  const c = new BithumbClient({ fetchImpl: hang, timeoutMs: 30 });
+  await assert.rejects(c.ticker('KRW-BTC'), /응답 없음/);
+});

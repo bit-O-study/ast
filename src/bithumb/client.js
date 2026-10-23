@@ -16,11 +16,12 @@ export function mapCandle(c) {
 }
 
 export class BithumbClient {
-  constructor({ accessKey = '', secretKey = '', fetchImpl = globalThis.fetch, base = 'https://api.bithumb.com' } = {}) {
+  constructor({ accessKey = '', secretKey = '', fetchImpl = globalThis.fetch, base = 'https://api.bithumb.com', timeoutMs = 10000 } = {}) {
     this.accessKey = accessKey;
     this.secretKey = secretKey;
     this.fetch = fetchImpl;
     this.base = base;
+    this.timeoutMs = timeoutMs;
   }
 
   async request(method, path, params = {}, auth = false) {
@@ -38,8 +39,19 @@ export class BithumbClient {
       if (!this.accessKey || !this.secretKey) throw new Error('빗썸 API 키가 설정되지 않았습니다');
       headers.authorization = 'Bearer ' + buildToken(this.accessKey, this.secretKey, qs);
     }
-    const res = await this.fetch(url, { method, headers, body });
-    const text = await res.text();
+    // 모든 요청에 타임아웃 (CONTRACTS C3). 주문 요청이 타임아웃되면 체결 여부를 알 수 없으므로 T-006에서 조회로 확인한다
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), this.timeoutMs);
+    let res, text;
+    try {
+      res = await this.fetch(url, { method, headers, body, signal: ctrl.signal });
+      text = await res.text();
+    } catch (e) {
+      if (e.name === 'AbortError') throw new Error(`빗썸 API 응답 없음 (${this.timeoutMs / 1000}초) ${method} ${path}`);
+      throw e;
+    } finally {
+      clearTimeout(timer);
+    }
     let data;
     try { data = JSON.parse(text); } catch { data = text; }
     if (!res.ok) {

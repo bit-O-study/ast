@@ -10,8 +10,9 @@ const kstDay = (t) => new Date(t + 9 * 3600e3).toISOString().slice(0, 10);
 //  - PRICE_POLL_SEC마다 현재가 확인 → 손절가·목표가 도달 시 매도, 계좌 손실 한도 확인
 //  - 봉이 마감되면 판단 점수 계산 → 신규 진입 또는 보유 포지션 손절가 조정
 export class Trader {
-  constructor({ cfg, client, broker, store, log = console.log }) {
-    Object.assign(this, { cfg, client, broker, store, log });
+  // now: 현재 시각 함수. 리플레이 검증에서는 가짜 시계를 넣는다
+  constructor({ cfg, client, broker, store, log = console.log, now = Date.now }) {
+    Object.assign(this, { cfg, client, broker, store, log, now });
     this.unitMs = cfg.unit * 60e3;
     this.strategy = getStrategy(cfg.strategy);
     this.candles = [];
@@ -32,11 +33,12 @@ export class Trader {
   get state() { return this.store.state; }
 
   emit(type, data) {
-    const e = this.store.event(type, data);
+    const e = this.store.event(type, { at: this.now(), ...data });
     this.log(`[${new Date(e.at).toLocaleString('ko-KR')}] ${type} ${data.msg ?? ''}`);
   }
 
-  async start() {
+  // 시세·잔고·봉을 읽고 기준점을 잡는다 (매매하지 않음)
+  async init() {
     this.price = (await this.client.ticker(this.cfg.market)).price;
     this.bal = await this.broker.balance();
     await this.refreshCandles();
@@ -45,10 +47,14 @@ export class Trader {
     if (!(this.state.lastCandleT >= last.t)) this.state.lastCandleT = last.t;
     const eq = this.equity();
     this.state.startEquity ??= eq;
-    this.state.day ??= kstDay(Date.now());
+    this.state.day ??= kstDay(this.now());
     this.state.dayStartEquity ??= eq;
     this.store.save();
     this.emit('start', { msg: `${this.broker.name} · ${this.cfg.market} ${this.cfg.unit}분봉 · 평가금액 ${Math.round(eq).toLocaleString('ko-KR')}원` });
+  }
+
+  async start() {
+    await this.init();
     this.timer = setInterval(() => this.tick(), this.cfg.pollSec * 1000);
     await this.tick();
   }
@@ -64,12 +70,13 @@ export class Trader {
     this.busy = true;
     try {
       this.price = (await this.client.ticker(this.cfg.market)).price;
+      // 봉이 마감됐으면 손절가 조정·진입을 먼저 처리하고, 그 손절가로 현재가를 확인한다
+      if (this.now() >= this.nextCandleAt) await this.onCandle();
       await this.checkPosition(this.price);
       await this.checkRisk(this.price);
-      if (Date.now() >= this.nextCandleAt) await this.onCandle();
       this.lastError = null;
     } catch (e) {
-      this.lastError = { at: Date.now(), message: e.message };
+      this.lastError = { at: this.now(), message: e.message };
       this.emit('error', { msg: e.message });
     } finally {
       this.busy = false;
@@ -78,7 +85,7 @@ export class Trader {
 
   // 마감된 봉만 받아 지표와 점수를 갱신. 새 봉이 생겼으면 true
   async refreshCandles() {
-    const now = Date.now();
+    const now = this.now();
     const rows = await this.client.candles(this.cfg.market, this.cfg.unit, { count: 200 });
     const closed = rows.filter((b) => b.t + this.unitMs <= now);
     if (closed.length < WARM + 2) throw new Error(`마감 봉이 부족합니다 (${closed.length}개)`);
@@ -117,7 +124,7 @@ export class Trader {
         at: b.t, close: b.c, prevClose: d[i - 1].c, atr: I.atr[i], s20: I.s20[i], prevS20: I.s20[i - 1],
         score: this.signal.score, barsHeld: Math.round((b.t - pos.entryCandleT) / this.unitMs),
       }, this.cfg);
-      for (const n of notes) this.emit('stop', { msg: `${n} → 손절가 ${Math.round(pos.stop).toLocaleString('ko-KR')}원` });
+      for (const n of notes) this.emit('stop', { msg: `${n} → 손절가 ${Math.round(pos.stop).toLocaleString('ko-KR')}원`, positionId: pos.id, stop: pos.stop, stopType: pos.stopType });
       this.store.save();
     } else if (this.signal.enter) {
       const rg = this.signal.regime;
@@ -141,34 +148,40 @@ export class Trader {
     const fill = await this.broker.buyMarket(krw, price);
     // 실제 체결가 기준으로 손절가·목표가를 다시 잡는다 (불가하면 신호 시점 계획 유지)
     const replanned = planEntry(d, this.I, i, fill.price, this.cfg);
-    const pos = openPosition({ at: Date.now(), price: fill.price, qty: fill.qty, cost: fill.cost, plan: replanned.ok ? replanned : plan, signal: this.signal });
+    const pos = openPosition({ at: this.now(), price: fill.price, qty: fill.qty, cost: fill.cost, plan: replanned.ok ? replanned : plan, signal: this.signal });
     pos.entryCandleT = d[i].t;
+    pos.id = `${this.cfg.market}-${pos.entryAt}`;
     this.state.position = pos;
     this.bal = await this.broker.balance();
     this.store.save();
     const w = (x) => Math.round(x).toLocaleString('ko-KR');
-    this.emit('buy', { msg: `매수 ${w(fill.price)}원 × ${fill.qty.toFixed(8)} · 손절가 ${w(pos.stop)} · 1차 목표 ${w(pos.t1)} · 2차 목표 ${w(pos.t2)}`, score: this.signal.score });
+    this.emit('buy', { msg: `매수 ${w(fill.price)}원 × ${fill.qty.toFixed(8)} · 손절가 ${w(pos.stop)} · 1차 목표 ${w(pos.t1)} · 2차 목표 ${w(pos.t2)}`,
+      positionId: pos.id, price: fill.price, qty: fill.qty, stop: pos.stop, t1: pos.t1, t2: pos.t2, score: this.signal.score });
   }
 
+  // 한 가격에서 1차·2차 목표가를 한꺼번에 넘을 수 있으므로 할 일이 없을 때까지 반복 (최대 3회)
   async checkPosition(price) {
-    const pos = this.state.position;
-    if (!pos) return;
-    const act = priceAction(pos, price, this.cfg);
-    if (act) await this.sell(act, price);
+    for (let k = 0; k < 3 && this.state.position; k++) {
+      const act = priceAction(this.state.position, price, this.cfg);
+      if (!act) return;
+      await this.sell(act, price);
+    }
   }
 
   async sell(act, price) {
     const pos = this.state.position;
     const fill = await this.broker.sellMarket(act.qty, price);
-    const closed = applyExit(pos, { at: Date.now(), price: fill.price, qty: fill.qty, proceeds: fill.proceeds, reason: act.reason, kind: act.kind }, this.cfg);
+    const closed = applyExit(pos, { at: this.now(), price: fill.price, qty: fill.qty, proceeds: fill.proceeds, reason: act.reason, kind: act.kind }, this.cfg);
     this.bal = await this.broker.balance();
     const w = (x) => Math.round(x).toLocaleString('ko-KR');
-    this.emit('sell', { msg: `${act.reason}: 매도 ${w(fill.price)}원 × ${fill.qty.toFixed(8)}${closed ? '' : ` · 남은 수량 손절가 ${w(pos.stop)}`}` });
+    this.emit('sell', { msg: `${act.reason}: 매도 ${w(fill.price)}원 × ${fill.qty.toFixed(8)}${closed ? '' : ` · 남은 수량 손절가 ${w(pos.stop)}`}`,
+      positionId: pos.id, price: fill.price, qty: fill.qty, kind: act.kind, remaining: pos.qty });
     if (closed) {
       const trade = toTrade(pos);
       this.store.addTrade(trade);
       this.state.position = null;
-      this.emit('close', { msg: `${trade.result} ${trade.pnl >= 0 ? '+' : ''}${w(trade.pnl)}원 (${trade.pct.toFixed(2)}%)` });
+      this.emit('close', { msg: `${trade.result} ${trade.pnl >= 0 ? '+' : ''}${w(trade.pnl)}원 (${trade.pct.toFixed(2)}%)`,
+        positionId: pos.id, result: trade.result, pnl: trade.pnl, pct: trade.pct });
       this.pushEquity();
     }
     this.store.save();
@@ -180,7 +193,7 @@ export class Trader {
 
   async checkRisk(price) {
     const eq = this.equity(price);
-    const today = kstDay(Date.now());
+    const today = kstDay(this.now());
     if (this.state.day !== today) { this.state.day = today; this.state.dayStartEquity = eq; this.store.save(); }
     if (!this.state.killed && eq <= this.state.startEquity * (1 - this.cfg.killSwitchLoss)) {
       this.emit('kill', { msg: `누적 손실 ${(this.cfg.killSwitchLoss * 100).toFixed(0)}% 도달: 전량 매도 후 정지` });
@@ -192,7 +205,7 @@ export class Trader {
 
   pushEquity() {
     const log = this.state.equityLog;
-    log.push({ t: Date.now(), equity: this.equity() });
+    log.push({ t: this.now(), equity: this.equity() });
     if (log.length > 3000) log.splice(0, log.length - 3000);
   }
 

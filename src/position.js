@@ -100,6 +100,7 @@ export function toTrade(pos) {
   const pnl = proceeds - pos.cost;
   const last = pos.exits[pos.exits.length - 1];
   return {
+    positionId: pos.id ?? null,
     entryAt: pos.entryAt, exitAt: last.at,
     entryIdx: pos.entryIdx, exitIdx: last.idx ?? null,
     entryPrice: pos.entryPrice, exitPrice: qty ? pos.exits.reduce((a, e) => a + e.price * e.qty, 0) / qty : last.price,

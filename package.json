@@ -4,10 +4,14 @@
   "description": "빗썸 API 기반 코인 자동매매 (판단 점수 + 손절가·목표가 관리)",
   "type": "module",
   "private": true,
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
+    "fetch": "node src/cli/fetch.js",
     "start": "node src/index.js",
     "backtest": "node src/cli/backtest.js",
-    "test": "node --test test/"
+    "test": "node --test test/",
+    "verify": "node src/cli/verify.js"
   }
 }

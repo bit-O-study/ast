@@ -37,7 +37,9 @@ export function createTradeStream({
   url = 'wss://ws-api.bithumb.com/websocket/v1',
   staleMs = 60000,              // 이 시간 동안 메시지 없으면 'stale' 알리고 재연결
   backoffMs = [1000, 2000, 5000, 10000, 30000],
-}) → { close(), lastPrice(market): number|null, status(): string }
+}) → { close(), lastPrice(market): number|null, lastAt(market): number|null, status(): string }
+
+2026-10-23 계약 C8 보강: stale은 연결 단위, 재연결 후 `onStatus('open', { reconnect: true })`, 역순 체결은 `lastPrice` 미갱신, 같은 `sequential_id`는 한 번만 전달 (최근 1,000개). `CONTRACTS.md` C8 참고.
 ```
 
 ## 동작
