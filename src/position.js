@@ -24,8 +24,14 @@ const SELL_REASON = {
   timeout: '보유기간 초과 후 손절가 도달',
 };
 
-export function openPosition({ at, idx = null, price, qty, cost, plan, signal }) {
+function strategySnapshot(strategy) {
+  if (typeof strategy?.id !== 'string' || !strategy.id.trim()) return null;
+  return { id: strategy.id, name: typeof strategy.name === 'string' && strategy.name.trim() ? strategy.name : strategy.id };
+}
+
+export function openPosition({ at, idx = null, price, qty, cost, plan, signal, strategy = null }) {
   return {
+    strategy: strategySnapshot(strategy),
     entryAt: at, entryIdx: idx, entryPrice: price,
     qty, qtyInit: qty, cost,
     stop: plan.stop, stopType: 'initial', initialStop: plan.stop,
@@ -101,6 +107,7 @@ export function toTrade(pos) {
   const last = pos.exits[pos.exits.length - 1];
   return {
     positionId: pos.id ?? null,
+    strategy: strategySnapshot(pos.strategy),
     entryAt: pos.entryAt, exitAt: last.at,
     entryIdx: pos.entryIdx, exitIdx: last.idx ?? null,
     entryPrice: pos.entryPrice, exitPrice: qty ? pos.exits.reduce((a, e) => a + e.price * e.qty, 0) / qty : last.price,

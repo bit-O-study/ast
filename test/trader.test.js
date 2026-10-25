@@ -83,3 +83,31 @@ test('일시정지 중에도 손절가 매도는 작동한다', async () => {
   await trader.tick();
   assert.equal(store.state.position, null);
 });
+
+for (const legacy of [false, true]) {
+  test('저장 재시작과 전략 설정 변경 후 기존 진입 기록 보존: legacy=' + legacy, async () => {
+    const { cfg, store, client, trader } = setup();
+    try {
+      await trader.init();
+      await trader.enter();
+      const original = { ...store.state.position.strategy };
+      assert.equal(original.id, 'score');
+      if (legacy) delete store.state.position.strategy;
+      client.price = store.state.position.t1;
+      await trader.tick();
+      assert.ok(store.state.position.t1Done);
+      store.save();
+      const restored = new Store(store.dir);
+      const changed = { ...cfg, strategy: 'breakout' };
+      const next = new Trader({ cfg: changed, client, broker: new PaperBroker(restored, changed), store: restored, log: () => {} });
+      await next.init();
+      client.price = restored.state.position.t2;
+      await next.tick();
+      assert.equal(restored.state.position, null);
+      assert.deepEqual(restored.trades()[0].strategy, legacy ? null : original);
+    } finally {
+      trader.stop();
+      fs.rmSync(store.dir, { recursive: true, force: true });
+    }
+  });
+}

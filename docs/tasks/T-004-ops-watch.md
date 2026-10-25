@@ -65,11 +65,20 @@ healthchecks.io 가입 → 체크 만들기(Period 2분, Grace 3분 권장) → 
 
 ## 결정 사항
 
--
+- 생성 즉시 조회하고 주기 타이머는 unref. heartbeat ping 및 IP check가 진행 중이면 동일 Promise를 반환하여 중첩 요청 방지.
+- heartbeat ping/fail 요청은 직렬화. fail은 pathname 뒤 /fail을 붙이고 기존 query 유지. 빈 URL은 비활성화.
+- 요청·응답 본문 시간 초과에 AbortController와 Promise.race 적용. stop 뒤 대기 요청/다음 IP 소스/사용자 콜백을 시작하지 않으며 이미 시작된 요청은 종료 또는 타임아웃까지 남을 수 있음.
+- IP는 node:net isIP 검증, IPv6는 URL 파서로 정규화, zone ID는 거절. 첫 값 onInitial, 변경 onChange. 모두 실패하면 check는 null, current는 이전 값 유지. sources: []는 IP 감시 비활성화.
+- 콜백의 동기 예외/비동기 rejection 격리. 감시 URL/토큰/서비스 응답을 오류 메시지에 노출하지 않음.
+- HTTP 2xx는 요청 성공으로만 판단하며 감시 서비스 알림 전달까지 보장하지 않음. fail 후 자동 정상 ping이 복구를 알릴 수 있으므로 치명적 중단 시 T-008에서 fail 후 stop 적용 필요.
 
 ## 작업 로그
 
--
+- 2026-10-23 Codex: `src/ops/heartbeat.js`, `src/ops/ipWatcher.js`, `test/ops.test.js`, `docs/setup/healthchecks.md` 구현.
+- 전용 테스트 15개 통과: 즉시·주기 호출/중첩 방지/타임아웃/종료, fail POST 경로/본문, IP 변경/fallback/형식/IPv6 정규화/기존 값 보존/콜백 실패 격리. 전체 npm test 89/89 통과.
+- 공인 IP 실조회 두 번 성공, 같은 IP, onInitial 1회, onChange 0회, 오류 0회, stop 이후 check는 null. IP 주소 자체는 로그에 남기지 않음. 샌드박스 외부 네트워크 승인 후 실행.
+- V4 부분 검증: IP 조회만 확인. 실제 Healthchecks 체크·휴대폰 알림은 설정이 없어 미실시. V3는 T-008 연결 후 진행.
+- Claude 리뷰 요청. 실제 서비스 알림 검증을 완료로 처리하지 않음.
 
 ## 리뷰
 

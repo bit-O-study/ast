@@ -15,12 +15,37 @@ const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&l
 const STOP_LABEL = { initial: '초기 손절가', breakeven: '본전 손절가', trail: '추적 손절가', breach: '이탈 경계 손절가', timeout: '보유기간 경계 손절가' };
 
 const S = { status: null, chart: null, trades: [], filter: 'all', bt: null, hover: {} };
-const api = async (p, opt) => {
-  const r = await fetch(p, opt);
-  const j = await r.json();
-  if (!r.ok) throw new Error(j.error || r.statusText);
-  return j;
+const api = async (p, opt = {}, timeoutMs = 10000) => {
+  const abort = new AbortController();
+  const timer = setTimeout(() => abort.abort(), timeoutMs);
+  try {
+    const r = await fetch(p, { ...opt, signal: abort.signal });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || '서버 요청에 실패했습니다.');
+    return j;
+  } catch (e) {
+    if (abort.signal.aborted) throw new Error('서버 응답 시간이 초과되었습니다.');
+    throw e;
+  } finally { clearTimeout(timer); }
 };
+const loading = new Set(), failures = new Map(), updated = new Map();
+async function refresh(key, label, action) {
+  if (loading.has(key)) return;
+  loading.add(key);
+  if (key === 'trades') updatePerformanceExport();
+  try {
+    await action(); updated.set(key, Date.now()); failures.delete(key);
+  } catch {
+    failures.set(key, label);
+    if (key === 'status') $('#run-state').textContent = '서버 연결 끊김';
+  } finally {
+    loading.delete(key);
+    if (key === 'trades') updatePerformanceExport();
+    const notice = $('#connection-status');
+    notice.hidden = failures.size === 0;
+    notice.textContent = [...failures].map(([id, name]) => name + ' 갱신 실패 · ' + (updated.has(id) ? '마지막 성공 ' + kst(updated.get(id), true) + ' KST' : '아직 받은 데이터 없음')).join(' / ') + (failures.size ? ' · 자동으로 다시 확인합니다. 표시된 값은 최신이 아닐 수 있습니다.' : '');
+  }
+}
 
 // ───────── KPI ─────────
 function kpiHtml(s, extra) {
@@ -142,8 +167,12 @@ function drawChart(cv, data, opt) {
   const pos = data.position;
   let lo = Infinity, hi = -Infinity;
   d.forEach((b, i) => { lo = Math.min(lo, b.l, fin(data.bbL[i]) ? data.bbL[i] : Infinity); hi = Math.max(hi, b.h, fin(data.bbU[i]) ? data.bbU[i] : -Infinity); });
-  if (pos) { lo = Math.min(lo, pos.stop); hi = Math.max(hi, pos.t1Done ? pos.t2 : pos.t1); }
-  const py = (hi - lo) * 0.05; lo -= py; hi += py;
+  if (pos) {
+    // 실제로 그리는 진입가·손절가·목표가를 모두 화면 안에 둡니다.
+    const levels = [pos.entryPrice, pos.stop, pos.t2, ...(!pos.t1Done ? [pos.t1] : [])].filter(fin);
+    lo = Math.min(lo, ...levels); hi = Math.max(hi, ...levels);
+  }
+  const py = Math.max((hi - lo) * 0.05, Math.abs(hi) * 0.001, 1e-8); lo -= py; hi += py;
   const Y = (v) => top + ((hi - v) / (hi - lo)) * (pH - top);
   ctx.font = `11px ${css('--f-mono')}`; ctx.textBaseline = 'middle'; ctx.lineWidth = 1;
 
@@ -268,16 +297,28 @@ function redraw() {
 }
 
 // ───────── 데이터 갱신 ─────────
-async function loadStatus() { try { renderStatus(await api('/api/status')); redraw(); } catch (e) { $('#run-state').textContent = '서버 연결 끊김'; } }
-async function loadChart() { try { S.chart = await api('/api/chart'); redraw(); } catch {} }
-async function loadLists() {
-  try { S.trades = await api('/api/trades'); renderTrades(); renderEvents(await api('/api/events')); } catch {}
+function loadStatus() { return refresh('status', '계좌 상태', async () => { renderStatus(await api('/api/status')); redraw(); }); }
+function loadChart() { return refresh('chart', '가격 차트', async () => { S.chart = await api('/api/chart'); redraw(); }); }
+function loadLists() {
+  return Promise.all([
+    refresh('trades', '거래 내역', async () => { S.trades = await api('/api/trades'); renderTrades(); performanceState.loaded = true; renderPerformance(); }),
+    refresh('events', '작동 기록', async () => { renderEvents(await api('/api/events')); }),
+  ]);
 }
 
 async function runBacktest() {
-  const btn = $('#bt-run'); btn.disabled = true; btn.textContent = '시세 받는 중…';
+  const btn = $('#bt-run');
+  if (btn.disabled) return;
+  btn.disabled = true; btn.textContent = '시세 받는 중…';
+  S.bt = null;
+  $('#bt-kpis').textContent = '백테스트 계산 중…';
+  $('#bt-trades tbody').innerHTML = '';
+  for (const id of ['#cv-bt', '#cv-bt-eq']) {
+    const cv = $(id); cv.getContext('2d').clearRect(0, 0, cv.width, cv.height); cv._geo = null;
+  }
+  S.hover['cv-bt'] = null; $('#tip-bt').hidden = true;
   try {
-    S.bt = await api('/api/backtest?count=' + $('#bt-count').value);
+    S.bt = await api('/api/backtest?count=' + $('#bt-count').value, {}, 120000);
     const s = S.bt.stats, diff = s.ret - s.holdRet;
     $('#bt-kpis').innerHTML = kpiHtml(s, `<div class="kpi"><div class="l">단순 보유 대비</div><div class="v ${cls(diff)}">${sgn(diff)}${Math.abs(diff).toFixed(1)}%p</div><div class="s">보유 시 ${signedPct(s.holdRet, 1)} · 보류 신호 ${S.bt.skipped}건</div></div>`);
     $('#bt-trades tbody').innerHTML = tradeRows(S.bt.trades);
@@ -287,16 +328,159 @@ async function runBacktest() {
   } finally { btn.disabled = false; btn.textContent = '백테스트 실행'; }
 }
 
-const control = async (action) => { try { await api('/api/control', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action }) }); } catch (e) { alert(e.message); } loadStatus(); loadLists(); };
+let controlPending = false;
+const control = async (action) => {
+  if (controlPending) return;
+  controlPending = true;
+  const buttons = ['#btn-pause', '#btn-resume', '#btn-sellall', '#btn-sellall-yes', '#btn-sellall-no'].map($);
+  buttons.forEach(b => { b.disabled = true; });
+  const notice = $('#control-status');
+  notice.hidden = false; notice.textContent = '요청을 처리하고 있습니다…';
+  try {
+    await api('/api/control', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action }) });
+    notice.textContent = '요청을 처리했습니다. 최신 상태를 확인합니다.';
+  } catch {
+    notice.textContent = '요청 처리 결과를 확인하지 못했습니다. 자동 재요청하지 않습니다. 계좌 상태와 거래 내역을 확인한 뒤 다시 조작하세요.';
+  } finally {
+    await Promise.all([loadStatus(), loadLists()]);
+    controlPending = false;
+    buttons.forEach(b => { b.disabled = false; });
+  }
+};
+
+// ───────── 청산일 기준 성과 ─────────
+let performanceTools = null, performanceError = false;
+const performanceState = { month: kst(Date.now(), true).slice(0, 7), day: kst(Date.now(), true).slice(0, 10), loaded: false, count: 0 };
+import('/performance.js').then(module => { performanceTools = module; renderPerformance(); }).catch(() => {
+  performanceError = true; renderPerformance();
+});
+
+function updatePerformanceExport() {
+  $('#perf-export').disabled = !performanceTools || !performanceState.loaded || !performanceState.count || loading.has('trades') || failures.has('trades');
+}
+$('#perf-export').onclick = () => {
+  if ($('#perf-export').disabled) return;
+  const notice = $('#perf-export-status');
+  notice.hidden = false;
+  try {
+    const month = performanceState.month;
+    const result = performanceTools.monthlyCsv(S.trades, month);
+    if (!result.count) return;
+    const url = URL.createObjectURL(new Blob([result.csv], { type: 'text/csv;charset=utf-8' }));
+    const link = document.createElement('a');
+    try {
+      link.href = url; link.download = 'AST-청산거래-' + month + '.csv'; link.hidden = true;
+      document.body.append(link); link.click();
+      notice.textContent = month + ' 청산 거래 ' + result.count + '건의 CSV 다운로드를 요청했습니다.';
+    } finally {
+      link.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+  } catch {
+    notice.textContent = 'CSV 파일을 만들지 못했습니다. 새로고침 후 다시 시도해 주세요.';
+  }
+};
+
+function renderPerformance() {
+  const state = $('#perf-state');
+  const ready = performanceTools && performanceState.loaded;
+  $('#perf-content').hidden = !ready;
+  if (!ready) {
+    state.textContent = performanceError ? '성과 화면을 불러오지 못했습니다. 새로고침해 주세요.' : '거래 기록을 불러오는 중입니다.';
+    return;
+  }
+  const month = performanceTools.summarizeMonth(S.trades, performanceState.month);
+  const { summary } = month;
+  performanceState.count = summary.count;
+  updatePerformanceExport();
+  $('#perf-month').textContent = `${month.year}년 ${month.number}월`;
+  $('#perf-prev').disabled = month.month === '1970-01';
+  $('#perf-next').disabled = month.month === '9999-12';
+  state.textContent = (summary.count ? `이번 달 청산 거래 ${summary.count}건` : '이번 달 청산된 거래가 없습니다.') + (month.invalid ? ` · 날짜나 손익을 확인할 수 없는 기록 ${month.invalid}건은 집계에서 제외했습니다.` : '');
+  $('#perf-summary').innerHTML = [
+    ['청산 순손익', signedWon(summary.pnl), cls(summary.pnl)],
+    ['청산 거래', summary.count + '건', ''],
+    ['성공', summary.wins + '건', 'pos'],
+    ['실패 · 0원 포함', summary.losses + '건', 'neg'],
+  ].map(([label, value, color]) => `<div class="perf-stat"><span class="muted small">${label}</span><strong class="mono ${color}">${value}</strong></div>`).join('');
+  const groups = performanceTools.summarizeStrategies(S.trades, performanceState.month);
+  $('#perf-strategies tbody').innerHTML = groups.length ? groups.map(g => `<tr><td>${esc(g.name)}${g.id == null ? '' : '<br><span class="muted small">' + esc(g.id) + '</span>'}</td><td class="n">${g.count}건</td><td class="n">${g.wins}건</td><td class="n">${g.losses}건</td><td class="n mono ${cls(g.pnl)}">${signedWon(g.pnl)}</td></tr>`).join('') : '<tr><td colspan="5" class="empty">이번 달 청산된 거래가 없습니다.</td></tr>';
+  const focused = document.activeElement?.dataset.day;
+  const compact = value => {
+    const n = Math.round(Math.abs(value));
+    const short = v => v.toFixed(1).replace(/\.0$/, '');
+    return sgn(value) + (n >= 1e8 ? short(n / 1e8) + '억' : n >= 1e4 ? short(n / 1e4) + '만' : n >= 1000 ? short(n / 1000) + '천' : won(n));
+  };
+  const today = performanceTools.kstDate(Date.now());
+  $('#perf-calendar').innerHTML = '<div class="calendar-gap" aria-hidden="true"></div>'.repeat(month.offset) + month.days.map(d => {
+    const label = `${d.key} · ${d.count ? `청산 ${d.count}건 · 순손익 ${signedWon(d.pnl)}` : '청산 거래 없음'}`;
+    return `<button type="button" class="calendar-day ${d.count ? 'has-trades' : ''}" data-day="${d.key}" tabindex="${d.key === performanceState.day ? 0 : -1}" aria-pressed="${d.key === performanceState.day}" ${d.key === today ? 'aria-current="date"' : ''} aria-label="${label}" title="${label}"><span class="calendar-number">${d.day}</span><span class="calendar-pnl ${cls(d.pnl)}">${d.count ? compact(d.pnl) : '—'}</span><span class="calendar-count">${d.count ? d.count + '건' : ''}</span></button>`;
+  }).join('');
+  if (focused) $('#perf-calendar').querySelector(`[data-day="${focused}"]`)?.focus({ preventScroll: true });
+  const selected = month.days.find(d => d.key === performanceState.day) ?? month.days[0];
+  $('#perf-day-title').textContent = `${selected.key} 청산 거래`;
+  $('#perf-day-summary').textContent = `${selected.count}건 · 순손익 ${signedWon(selected.pnl)}`;
+  $('#perf-trades tbody').innerHTML = selected.count ? tradeRows(selected.trades) : '<tr><td colspan="10" class="empty">선택한 날짜에 청산된 거래가 없습니다.</td></tr>';
+}
+function changePerformanceMonth(delta) {
+  if (!performanceTools) return;
+  performanceState.month = performanceTools.shiftMonth(performanceState.month, delta);
+  performanceState.day = performanceState.month + '-01';
+  renderPerformance();
+}
+$('#perf-prev').onclick = () => changePerformanceMonth(-1);
+$('#perf-next').onclick = () => changePerformanceMonth(1);
+$('#perf-today').onclick = () => {
+  performanceState.day = kst(Date.now(), true).slice(0, 10);
+  performanceState.month = performanceState.day.slice(0, 7);
+  renderPerformance();
+};
+$('#perf-calendar').onclick = e => {
+  const button = e.target.closest('button[data-day]');
+  if (!button) return;
+  performanceState.day = button.dataset.day;
+  renderPerformance();
+};
+
+$('#perf-calendar').onkeydown = e => {
+  const button = e.target.closest('button[data-day]');
+  if (!button || !performanceTools || e.altKey || e.ctrlKey || e.metaKey) return;
+  const steps = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 };
+  const day = button.dataset.day;
+  let next;
+  if (Object.hasOwn(steps, e.key)) next = performanceTools.shiftDay(day, steps[e.key]);
+  else if (e.key === 'Home') next = day.slice(0, 7) + '-01';
+  else if (e.key === 'End') next = day.slice(0, 7) + '-' + performanceTools.monthInfo(day.slice(0, 7)).length;
+  else return;
+  e.preventDefault();
+  performanceState.day = next; performanceState.month = next.slice(0, 7);
+  renderPerformance();
+  $('#perf-calendar').querySelector('[data-day="' + next + '"]')?.focus({ preventScroll: true });
+};
 
 // ───────── 이벤트 ─────────
 function showTab(name) {
+  for (const tab of ['live', 'bt', 'performance']) $('#tab-' + tab).tabIndex = tab === name ? 0 : -1;
   $('#tab-live').setAttribute('aria-selected', name === 'live'); $('#tab-bt').setAttribute('aria-selected', name === 'bt');
   $('#view-live').hidden = name !== 'live'; $('#view-bt').hidden = name !== 'bt';
+  $('#tab-performance').setAttribute('aria-selected', name === 'performance');
+  $('#view-performance').hidden = name !== 'performance';
+  if (name === 'performance') renderPerformance();
   if (name === 'bt' && !S.bt) runBacktest(); else redraw();
 }
 $('#tab-live').onclick = () => showTab('live');
 $('#tab-bt').onclick = () => showTab('bt');
+$('#tab-performance').onclick = () => showTab('performance');
+document.querySelector('.tabs').onkeydown = e => {
+  if (e.target.getAttribute('role') !== 'tab' || e.altKey || e.ctrlKey || e.metaKey) return;
+  const tabs = ['live', 'bt', 'performance'], current = tabs.indexOf(e.target.id.slice(4));
+  let next;
+  if (e.key === 'ArrowRight') next = (current + 1) % tabs.length;
+  else if (e.key === 'ArrowLeft') next = (current + tabs.length - 1) % tabs.length;
+  else if (e.key === 'Home') next = 0;
+  else if (e.key === 'End') next = tabs.length - 1;
+  else return;
+  e.preventDefault(); showTab(tabs[next]); $('#tab-' + tabs[next]).focus();
+};
 $('#bt-run').onclick = runBacktest;
 $('#btn-pause').onclick = () => control('pause');
 $('#btn-resume').onclick = () => control('resume');

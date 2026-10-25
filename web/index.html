@@ -18,15 +18,17 @@
     </div>
     <div class="price-box"><span class="mono" id="price">—</span><span class="muted" id="run-state">연결 중</span></div>
     <nav class="tabs" role="tablist">
-      <button role="tab" id="tab-live" aria-selected="true">실시간</button>
-      <button role="tab" id="tab-bt" aria-selected="false">백테스트</button>
+      <button role="tab" id="tab-live" aria-controls="view-live" tabindex="0" aria-selected="true">실시간</button>
+      <button role="tab" id="tab-bt" aria-controls="view-bt" tabindex="-1" aria-selected="false">백테스트</button>
+      <button role="tab" id="tab-performance" aria-controls="view-performance" tabindex="-1" aria-selected="false">성과</button>
     </nav>
   </div>
 </header>
 
 <main class="wrap">
+  <p class="alert" id="connection-status" role="status" hidden></p>
   <!-- 실시간 -->
-  <section id="view-live">
+  <section id="view-live" role="tabpanel" aria-labelledby="tab-live">
     <div class="alert" id="alert" hidden></div>
     <div class="kpis" id="kpis"></div>
 
@@ -43,7 +45,7 @@
         <div class="chart-wrap"><canvas id="cv-live" class="cv-main"></canvas><div class="tip" id="tip-live" hidden></div></div>
       </div>
       <aside class="side">
-        <div class="panel pos" id="position"></div>
+        <div class="panel position-panel" id="position"></div>
         <div class="panel sig" id="signal"></div>
       </aside>
     </div>
@@ -61,6 +63,8 @@
       </div>
     </div>
 
+    <p class="alert" id="control-status" role="status" hidden></p>
+
     <div class="two">
       <div>
         <div class="tbl-head"><h3>거래 내역</h3>
@@ -76,7 +80,7 @@
   </section>
 
   <!-- 백테스트 -->
-  <section id="view-bt" hidden>
+  <section id="view-bt" role="tabpanel" aria-labelledby="tab-bt" hidden>
     <div class="panel controls">
       <div><h3>빗썸 실제 시세 백테스트</h3><p class="muted small">현재 설정(.env)의 손절가·목표가 규칙을 그대로 과거 시세에 적용합니다. 신호는 봉 마감 후 계산하고 다음 봉 시가에 매수합니다.</p></div>
       <div class="btns">
@@ -93,6 +97,30 @@
       <canvas id="cv-bt-eq" class="cv-eq"></canvas>
     </div>
     <div class="scroll"><table id="bt-trades"><thead><tr><th>결과</th><th>진입</th><th class="n">진입가</th><th class="n">손절가</th><th class="n">목표가</th><th>청산</th><th class="n">청산가</th><th>청산 사유</th><th class="n">순손익</th><th class="n">수익률</th></tr></thead><tbody></tbody></table></div>
+  </section>
+  <!-- 저장된 청산 거래 기준 성과 -->
+  <section id="view-performance" role="tabpanel" aria-labelledby="tab-performance" hidden>
+    <div class="panel controls">
+      <div><h3>손익 달력</h3><p class="muted small">저장된 청산 거래 기준 · KST</p></div>
+      <div class="btns"><button class="btn" id="perf-prev" aria-label="이전 달">←</button><strong id="perf-month" aria-live="polite">불러오는 중</strong><button class="btn" id="perf-next" aria-label="다음 달">→</button><button class="btn" id="perf-today">이번 달</button><button class="btn" id="perf-export" disabled>월별 CSV 저장</button></div>
+    </div>
+    <p class="muted small">부분 매도 손익은 최종 청산일에 합산됩니다. 보유분 평가손익과 백테스트 결과는 포함하지 않습니다.</p>
+    <p id="perf-export-status" class="muted small" role="status" hidden></p>
+    <p id="perf-state" class="muted small" role="status">거래 기록을 불러오는 중입니다.</p>
+    <div id="perf-content" hidden>
+      <div class="perf-summary panel" id="perf-summary"></div>
+      <div class="panel calendar-panel">
+        <div class="calendar-week" aria-hidden="true"><span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span></div>
+        <div id="perf-calendar" class="calendar-grid" role="group" aria-label="청산일 선택" aria-describedby="perf-key-help"></div>
+        <p class="muted small">금액 단위: 원 · 날짜를 누르면 정확한 합계와 거래 내역을 볼 수 있습니다.</p>
+        <p id="perf-key-help" class="muted small">키보드: 좌우 하루 · 상하 일주일 · Home 월초 · End 월말 이동</p>
+      </div>
+      <div class="tbl-head"><h3>전략별 월간 성과</h3></div>
+      <p class="muted small">진입 당시 저장된 전략 기준입니다. 기존 기록은 전략 정보 없음으로 표시합니다. 같은 ID는 합산하며 이름은 이달 최신 청산 기록을 사용합니다.</p>
+      <div class="scroll"><table id="perf-strategies"><thead><tr><th>진입 전략</th><th class="n">청산</th><th class="n">성공</th><th class="n">실패 · 0원 포함</th><th class="n">순손익</th></tr></thead><tbody></tbody></table></div>
+      <div class="tbl-head"><h3 id="perf-day-title">날짜별 거래</h3><span id="perf-day-summary" class="small mono"></span></div>
+      <div class="scroll"><table id="perf-trades"><thead><tr><th>결과</th><th>진입</th><th class="n">진입가</th><th class="n">손절가</th><th class="n">목표가</th><th>청산</th><th class="n">청산가</th><th>청산 사유</th><th class="n">순손익</th><th class="n">수익률</th></tr></thead><tbody></tbody></table></div>
+    </div>
   </section>
 </main>
 <script src="/app.js"></script>

@@ -73,3 +73,11 @@ test('돌파 전략도 같은 손절가·목표가 규칙으로 백테스트된�
   assert.equal(r.strategy.id, 'breakout');
   for (const t of r.trades) assert.ok(t.initialStop < t.entryPrice && t.entryPrice < t.t1);
 });
+
+test('두 전략의 모든 백테스트 청산에 실제 진입 전략이 기록된다', () => {
+  for (const strategy of ['score', 'breakout']) {
+    const r = backtest(synth(4), { ...cfg, strategy });
+    assert.ok(r.trades.length > 0);
+    for (const t of r.trades) assert.deepEqual(t.strategy, r.strategy);
+  }
+});

@@ -27,6 +27,50 @@
 | 2026-10-23 | 빗썸 클라이언트 타임아웃 (Codex 요청) | V1 | 통과 | `test/bithumb.test.js` |
 | 2026-10-23 | T-002 캔들 수집·캐시 | V1 | 통과 (전용 16개, 전체 55개) | `test/candleStore.test.js`, T-002 작업 로그 |
 | 2026-10-23 | T-002 캔들 수집·캐시 | V4 | 통과 (BTC 240분봉 1,199개, 누락 0; 재수집 요청 6→1회, 1,862→523ms) | `npm run fetch -- KRW-BTC 240 1000` 두 번, T-002 작업 로그 |
+| 2026-10-23 | T-003 텔레그램 알림 | V1 | 통과 (전용 19개, 전체 89개) | `test/telegram.test.js`, T-003 작업 로그 |
+| 2026-10-23 | T-003 텔레그램 알림 | V4 | 미실시: 실제 봇/수신자 설정 및 발송 지시 필요 | `docs/setup/telegram.md` |
+| 2026-10-23 | T-004 생존/IP 감시 | V1 | 통과 (전용 15개, 전체 89개) | `test/ops.test.js` |
+| 2026-10-23 | T-004 생존/IP 감시 | V4 | 부분 통과: IP 실조회 2회 성공, 초기 콜백 1회, 변경/오류 0. Healthchecks 실제 알림 미실시 | T-004 작업 로그, `docs/setup/healthchecks.md` |
+| 2026-10-23 | T-003·T-004 | V3 | 미실시: T-008 연결 후 실시간 모의투자에서 확인 | 각 작업 로그 |
+| 2026-10-23 | T-005 실시간 체결가 | V1 | 통과 (전용 20개, 전체 109개) | test/ws.test.js, T-005 작업 로그 |
+| 2026-10-23 | T-005 실시간 체결가 | V4 | 통과 (BTC·ETH 65초, 체결 141건, 연결 1회, 오류 0, 종료 확인) | T-005 작업 로그 |
+| 2026-10-23 | T-005 실시간 체결가 | V3 | 미실시: T-008 연결 후 봉 마감 포함 모의투자 검증 필요 | T-005 작업 로그 |
+| 2026-10-25 | 서버 설정 | V1 | 통과: 로컬 및 서버 npm test 각각 109/109 | 서버 C:\ast\server-test-resume.log, server-ssh.md 작업 로그 |
+| 2026-10-25 | 서버 설정 | V3 | 부분 통과: 예약 작업 Running, paper 모드 실제 BTC 가격 수신, lastError=null. 봉 마감 포함 연속 운영/재부팅 복구는 미검증 | 서버 /api/status, /api/events, 예약 작업 설정 조회 |
+| 2026-10-25 | 서버 설정 후속 | V3 장애 복구 | 통과(자식 Node 종료 범위): 60.385초 후 PID 3484→2168, paper/잔고 유지/lastError=null/error 이벤트 0. 봉 마감·호스트 장애·재부팅은 미검증 | server-ssh.md 후속 작업 로그 |
+| 2026-10-25 | 서버 설정 후속 | V1 | 통과: 최종 수정 후 npm test 109/109, PowerShell 구문 검사 통과 | .server-test.log, run-paper.ps1 |
+| 2026-10-25 | 서버 봉 마감 관측 도구 | V1 | 통과: 전용 9개, 로컬·서버 전체 118/118 | test/server-observer.test.js, 서버 server-observer-tests.log |
+| 2026-10-25 | 서버 봉 마감 관측 도구 | V3 | 진행 중: 첫 샘플 정상. 12:00:03 KST 봉 마감 목표, 12:05:03 기한. 아직 통과 아님 | 서버 logs/paper-observation.json |
+| 2026-10-25 | 운영 점검 및 개발 폴더 이동 | V1 | 통과: 전용 15개, 이동 후 로컬·서버 전체 133/133, diff 검사 통과 | test/server-check.test.js, 서버 server-check-tests.log |
+| 2026-10-25 | 운영 점검 | V3 | 조회 정상: paper, 오류/경고 0, 관측 19회 진행 중. 봉 마감 통과 아님 | 서버 check-paper.mjs --json 실행, server-ssh.md |
+| 2026-10-25 | 서버 실행기 KST/회귀 검증 | V1 | 통과: 전용 2개, 로컬·서버 전체 135/135. 실제 격리 PowerShell/Node 재시작·mutex·환경 강제 검증 | test/server-runner.test.js, 서버 server-runner-tests.log |
+| 2026-10-25 | 서버 실행기 배포 | V3 | 운영 PID 2168 유지, 오류/경고 0, 관측 32회 진행 중. 새 실행기 KST는 다음 실행기 시작 시 적용 | server-ssh.md 작업 로그 |
+| 2026-10-25 | 잔존 Node 중복 기동 방지 | V1 | 통과: 로컬·서버 전체 136/136, 서버 최종 전용 3/3. 잔존 중 대기 및 종료 후 재개 확인 | test/server-runner.test.js, server-ssh.md |
+| 2026-10-25 | 실행기 보호 배포 | V3 | 기존 PID 2168 유지, 오류/경고 0, 봉 관측 49회 진행 중. 새 실행기 시작 시 보호 활성화 | 서버 check-paper.mjs 결과 |
+| 2026-10-25 | 실행 호스트 복구 반복 트리거 | V1 | 통과: 새 예약 작업 테스트 5개, 로컬 전체 141/141. 새 파일 서버 전송, 서버 테스트 미실행 | test/server-task.test.js, .server-test.log |
+| 2026-10-25 | 실행 호스트 복구 반복 트리거 | V3 | 미완료: probe 파일 생성 후 실행 정책 차단, 재시도 시 SSH 시간 초과. 운영 트리거 미갱신 | server-ssh.md 후속 절차 |
+| 2026-10-25 | 기존 봉 관측 | V3 | 마지막 확인 106회 정상. 이후 SSH 연결 불가로 현재 결과 확인 불가 | 마지막 조회 1792892934489 UTC ms |
+| 2026-10-25 | 실행 호스트 복구 반복 트리거 | V1 | 서버 전체 141/141 통과 | 서버 server-task-tests.log |
+| 2026-10-25 | 실행 호스트 복구 반복 트리거 | V3 | 격리 시험 통과: PowerShell 11412 종료 후 26.275초 내 10144 자동 기동. 운영 적용 전후 Node PID 2168 유지 | server-ssh.md, 서버 logs/host-recovery-probe-20261025 |
+| 2026-10-25 | Tailscale 연결 | V4 | 기존 호스트 키 엄격 대조 및 hostname 일치. 100.97.115.109로 SSH 접속 성공 | server-ssh.md Tailscale 접속 절 |
+| 2026-10-25 | 서버 모의투자 봉 마감 | V3 | 통과: 약 2시간 4분/249회 관측, 오류·재시작 0, 4시간 마감봉 신호 전진. 12:00:23 KST 보고서 passed | 서버 logs/paper-observation.json, server-ssh.md 최종 로그 |
+| 2026-10-25 | 새 실행기 활성화 | V3 | 무포지션 paper 확인 후 계획 재기동, PID 2168→4680, 잔고 1,000만 원 유지/오류 0/KST 로그 확인 | 서버 logs/paper-2026-10-25.log, API 상태 |
+| 2026-10-25 | 기본 대시보드 표시 수정 | V1 + 격리 Chromium | 전체 141/141, 브라우저 48/48 통과. 1440/390/320px × 밝음/어두움 | scripts/check-dashboard.mjs, logs/dashboard-check/result.json |
+| 2026-10-25 | 기본 대시보드 서버 반영 | V4 HTTP 확인 | 두 파일 로컬/서버 SHA256 일치, HTTP 수정 반영, paper 오류/경고 0, PID 4680 유지 | docs/setup/dashboard-check.md |
+| 2026-10-25 | 화면 연결·제어 후속 | V1 + 격리 Chromium | npm test 141/141, 브라우저 78/78 통과 (보유/부분 매도·조회 오류/복구·중복 제어·백테스트 재시도) | scripts/check-dashboard.mjs, logs/dashboard-check/result.json |
+| 2026-10-25 | 화면 후속 배포 | V4 HTTP 확인 | 세 파일 SHA256 일치, HTTP 새 코드 확인, PID 4680 유지/paper 오류 0 | docs/setup/dashboard-check.md |
+| 2026-10-25 | 차트 표시 범위 후속 | V1 + 격리 Chromium | 전체 141/141, 브라우저 90/90. 수정 전 목표가 잘림·고정 가격 좌표 오류 12개 재현 | scripts/check-dashboard.mjs, logs/dashboard-check/chart-before.json |
+| 2026-10-25 | 차트 스크립트 배포 | V4 HTTP 확인 | HTTP 새 코드 및 SHA256 일치, PID 4680 유지/paper 오류·경고 0 | docs/setup/dashboard-check.md |
+| 2026-10-25 | T-009A 손익 달력 | V1 + 격리 Chromium | 전용 7/7, 전체 148/148, 브라우저 114/114 통과 | test/performance.test.js, scripts/check-dashboard.mjs, T-009A 작업 로그 |
+| 2026-10-25 | T-009A 서버 배포 | V4 HTTP 확인 | 정적 파일 4개 해시 일치, 탭·달력·ESM 200 확인, PID 4680/paper 오류 0 | T-009A 작업 로그 |
+| 2026-10-25 | T-009A 키보드 조작 | V1 + 격리 Chromium | 날짜 9/9, 전체 150/150, 브라우저 132/132 통과 | test/performance.test.js, scripts/check-dashboard.mjs |
+| 2026-10-25 | T-009A 키보드 배포 | V4 HTTP 확인 | 세 파일 해시 일치, HTTP 키보드 코드 확인, PID 4680/paper 오류 0 | T-009A 작업 로그 |
+| 2026-10-25 | T-009A 월별 CSV | V1 + 격리 Chromium | 전용 13/13, 전체 154/154, 브라우저 150/150. 실제 다운로드 인코딩/합계/상태 검증 | test/performance.test.js, scripts/check-dashboard.mjs |
+| 2026-10-25 | T-009A CSV 배포 | V4 HTTP 확인 | 세 파일 해시 일치, CSV 버튼·모듈 제공, PID 4680/paper 오류 0 | T-009A 작업 로그 |
+
+| 2026-10-25 | T-009B 전략 기록/성과 | V1 + 격리 Chromium | 로컬·서버 전체 160/160, 브라우저 156/156. 부분 청산·재시작·전략 변경·기존 기록·CSV/HTML 확인 | T-009B 작업 로그, logs/dashboard-check/result.json |
+| 2026-10-25 | T-009B 전략 메타데이터 | V2 | BTC 17/ETH 16/XRP 20건 진입·청산 경로 100% 일치, 오류 0 | docs/verify/2026-10-25_KRW-*_240_score_btc.md |
+| 2026-10-25 | T-009B 서버 반영 | V4 HTTP + V3 진행 | 해시 6개 일치, PID 5852/paper 오류 0. 신규 봉 관측 running/1회, 다음 마감 결과 대기 | 서버 logs/paper-observation.json, T-009B 작업 로그 |
 
 ## 검증으로 찾은 문제
 
@@ -37,3 +81,19 @@
 | 2026-10-23 | 한 가격에서 1차·2차 목표가를 동시에 넘으면 실매매는 1차만 팔고 다음 확인까지 기다렸음 | 할 일이 없을 때까지 반복 처리 (`src/trader.js`) |
 | 2026-10-23 | 순손익: 리플레이가 백테스트보다 약 15% 나쁨 (BTC −45,785원 vs −39,795원) | 리플레이는 손절을 봉 저가 틱에서 체결해 비관적. 실제는 5초 간격 확인이라 그 사이. T-005(실시간 체결가)·V3 운영에서 실제 슬리피지를 측정해 판단 |
 | 2026-10-23 | .gitignore의 data/가 src/data/candleStore.js도 제외 | Claude가 루트 /data/로 수정 |
+| 2026-10-23 | 체결 ID가 안전한 정수 범위를 초과해 JSON.parse만 사용하면 다른 체결이 같은 ID로 반올림될 수 있음 | 큰 정수 토큰 보존 및 인접 ID 회귀 테스트 추가 (T-005) |
+| 2026-10-25 | 서버 Node.js 24에서 이전 npm test(node --test test/)가 디렉터리를 모듈로 해석하여 실패 | 로컬 검증본 package.json(node --test) 반영 후 서버 109/109 통과 |
+| 2026-10-25 | 작업 스케줄러에 재시작 설정이 있어도 강제 종료 후 Ready 상태로 남고 복구 안 됨(종료 코드 -1과 1 모두) | run-paper.ps1에 60초 순차 재시작 루프 추가, 실제 Node 강제 종료 후 자동 복구 확인. 스케줄러 원인은 미확정 |
+| 2026-10-25 | SSH에서 Start-Process로 실행한 관측 프로세스가 세션 종료 후 사라지고 보고서가 running에 머묾 | 수동 단발 SYSTEM 예약 작업 AST-Paper-Observation으로 실행 분리 |
+| 2026-10-25 | 새 실행기 테스트 파일 작성 중 줄바꿈 이스케이프 오류로 구문 분석 실패 | 문자열 이스케이프 수정 후 전용 및 전체 테스트 통과 |
+| 2026-10-25 | 실행기 mutex 해제 후 기존 Node가 남으면 새 실행기가 중복 Node를 시작할 수 있음 | 동일 절대 entry 경로의 잔존 Node 조회 후 대기, 실제 격리 회귀 테스트 통과 |
+| 2026-10-25 | 테스트 cleanup이 signalCode 종료를 구분하지 못해 이미 종료된 PID를 정리하려다 중단 | exitCode/signalCode 함께 검사, 남은 테스트 트리만 정리 후 통과 |
+| 2026-10-25 | 로컬 전체 테스트 부하에서 Windows 조회·기동 12초 제한 초과 | 대기 제한 30초로 조정, 조건 변경 없이 전체 136/136 통과 |
+| 2026-10-25 | 시험 설치 스크립트가 서버 기본 PowerShell 실행 정책으로 차단 | 시스템 정책 변경 없이 해당 호출의 ExecutionPolicy Bypass로 재시도 준비. SSH 연결 중단으로 실증 대기 |
+| 2026-10-25 | 서버 SSH 연결이 연속 시간 초과 | 기본 경로 확인. 원인 미확정, 운영 설정 변경 및 시험 작업 중단. 연결 회복 후 재개 필요 |
+| 2026-10-25 | section/confirm의 display 규칙이 hidden을 덮어 백테스트와 매도 확인창이 노출, pos 클래스가 수익과 패널에 중복 사용 | hidden 우선 규칙 및 position-panel 분리. 수정 전 24개 실패→수정 후 48/48 통과 |
+| 2026-10-25 | 조회 실패가 숨겨짐, 제어 중복 요청 가능, 백테스트 실패 후 이전 결과 잔존 | 갱신 경고/요청 제한·중복 잠금·결과 초기화 및 모의 브라우저 검증 통과 |
+| 2026-10-25 | 1차 달성 전 2차 목표가가 차트 축 범위 밖, 고정 가격 캔들에서 0으로 나눠 NaN 좌표 | 표시하는 가격 전체를 축에 포함하고 최소 여백 적용, 6개 브라우저 환경 검증 |
+| 2026-10-25 | T-009A DOM 선택자 문자열 치환 구문 오류, 320px 달력 금액 줄바꿈 | 리터럴 스크립트로 수정, 금액 요약 표시와 브라우저 줄 높이 검사 추가. 최종 검사 통과 |
+
+| 2026-10-25 | T-009B 브라우저 음수 기대값이 실제 유니코드 부호와 달라 6개 실패 | 테스트 기대값 수정 후 156/156, 화면 변경 없음 |

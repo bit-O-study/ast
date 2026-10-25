@@ -69,7 +69,7 @@ export function backtest(d, cfg, { capital = cfg.paperKrw, btc = null, signalFro
         const cost = qty * price * (1 + cfg.fee);
         if (cost >= cfg.minOrderKrw) {
           cash -= cost;
-          pos = openPosition({ at: b.t, idx: i, price, qty, cost, plan, signal: pending });
+          pos = openPosition({ at: b.t, idx: i, price, qty, cost, plan, signal: pending, strategy });
         }
       }
     }

@@ -148,7 +148,7 @@ export class Trader {
     const fill = await this.broker.buyMarket(krw, price);
     // 실제 체결가 기준으로 손절가·목표가를 다시 잡는다 (불가하면 신호 시점 계획 유지)
     const replanned = planEntry(d, this.I, i, fill.price, this.cfg);
-    const pos = openPosition({ at: this.now(), price: fill.price, qty: fill.qty, cost: fill.cost, plan: replanned.ok ? replanned : plan, signal: this.signal });
+    const pos = openPosition({ at: this.now(), price: fill.price, qty: fill.qty, cost: fill.cost, plan: replanned.ok ? replanned : plan, signal: this.signal, strategy: this.strategy });
     pos.entryCandleT = d[i].t;
     pos.id = `${this.cfg.market}-${pos.entryAt}`;
     this.state.position = pos;

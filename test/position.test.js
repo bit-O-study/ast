@@ -100,3 +100,18 @@ test('planEntry: 손절가는 최소 1 ATR 아래, 저항선이 가까우면 진
   assert.ok(capped.ok);
   assert.ok(capped.t1 < 108 && capped.t1 <= 100 + cfg.t1R * capped.R);
 });
+
+test('진입 전략은 복사되며 부분 매도·직렬화 후 청산에도 보존된다', () => {
+  const strategy = { id: 'score', name: '진입 전략' };
+  const pos = openPosition({ at: 0, price: 100000, qty: 1, cost: 100250, plan, strategy });
+  strategy.name = '변경';
+  applyExit(pos, { at: 1, price: 110000, qty: .5, proceeds: 54862.5, reason: '1차', kind: 't1' }, cfg);
+  const restored = JSON.parse(JSON.stringify(pos));
+  applyExit(restored, { at: 2, price: 120000, qty: .5, proceeds: 59850, reason: '2차', kind: 't2' }, cfg);
+  const trade = toTrade(restored);
+  assert.deepEqual(trade.strategy, { id: 'score', name: '진입 전략' });
+  restored.strategy.name = '다른 이름';
+  assert.equal(trade.strategy.name, '진입 전략');
+  delete restored.strategy;
+  assert.equal(toTrade(restored).strategy, null);
+});

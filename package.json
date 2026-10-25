@@ -11,7 +11,10 @@
     "fetch": "node src/cli/fetch.js",
     "start": "node src/index.js",
     "backtest": "node src/cli/backtest.js",
-    "test": "node --test test/",
+    "test": "node --test",
     "verify": "node src/cli/verify.js"
+  },
+  "dependencies": {
+    "ws": "^8.22.0"
   }
 }

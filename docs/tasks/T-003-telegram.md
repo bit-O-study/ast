@@ -71,11 +71,21 @@ BotFather로 봇 만들기 → 토큰 받기 → 봇에게 메시지 보내기 �
 
 ## 결정 사항
 
--
+- C3 종료 계약에 따라 `close()`, `flush({ timeoutMs })`, 생성자 `timeoutMs`(기본 10000)를 추가. 기존 `flush()`는 제한 없이 완료 대기하며 제한시간 초과는 onError 후 resolve. close 후 새 요청/결과 콜백 금지.
+- 전송 순서와 시작 간 최소 간격을 유지. 대기열 상한은 전송 중인 1건 제외, 초과 시 가장 오래된 대기 건 제거. 대기열은 메모리에만 보관.
+- HTTP 429는 retry_after 이후 1회 재시도, 두 번째 429의 대기시간도 다음 메시지에 적용. 네트워크·기타 HTTP 오류는 자동 재시도하지 않음.
+- 같은 error.msg는 이벤트 at가 아닌 수신 시각으로 60초 억제. onError 동기 예외/비동기 rejection 격리, 토큰 마스킹 적용.
+- 공식 API에 명시된 `link_preview_options: { is_disabled: true }`를 수정안에 사용. 위 명세의 구형 필드와 차이를 MESSAGES.md에 보고했고 Claude 리뷰 요청 상태. 공용 계약은 수정하지 않음.
+- 텍스트는 KST/한국어 라벨/원본 msg, 최대 4096 UTF-16 코드 유닛으로 생략 표시. HTML/Markdown 해석은 사용하지 않음.
+- fetch와 응답 본문 모두 제한시간 적용, AbortSignal을 무시하는 가짜 fetch도 Promise.race로 대기 종료. 백그라운드 타이머 unref, 명시적 flush 동안 ref하여 정상 종료 대기.
 
 ## 작업 로그
 
--
+- 2026-10-23 Codex: `src/notify/telegram.js`, `test/telegram.test.js`, `docs/setup/telegram.md` 작성.
+- 전용 테스트 19개 통과. 순서/간격, 429 재시도, 큐 초과, 반복 오류 억제, 네트워크/API/본문 실패, close/flush, 오류 처리기 실패, Store 구독 연결, 자식 프로세스 종료까지 가짜 fetch로 검증.
+- 전체 npm test 89/89 통과 (T-004 포함). 실제 토큰이나 외부 발송 없이 실행.
+- V4 실제 Telegram 수신 확인 미실시: 봇·수신자 설정과 실제 발송 지시가 필요. 설정/수동 확인 절차를 docs/setup/telegram.md에 작성. V3는 T-008 연결 후 확인 대상.
+- API 필드 변경안을 포함해 Claude 리뷰 요청. V4 미실시를 완료로 처리하지 않음.
 
 ## 리뷰
 
