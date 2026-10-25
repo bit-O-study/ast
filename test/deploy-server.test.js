@@ -55,7 +55,7 @@ for (const scenario of ['success', 'short', 'halted', 'position', 'live', 'hash'
     ].join('\r\n');
     const wrapper = join(base, 'test.ps1');
     await writeFile(wrapper, '\uFEFF' + script);
-    await exec('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', wrapper], { windowsHide: true, timeout: 50000 });
+    await exec('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', wrapper], { windowsHide: true, timeout: 50000, env: Object.fromEntries(Object.entries(process.env).filter(([key]) => key.toLowerCase() !== 'psmodulepath')) });
     const result = JSON.parse((await readFile(out, 'utf8')).replace(/^\uFEFF/, ''));
     const success = ['success', 'short', 'halted'].includes(scenario);
     if (success) assert.equal(result.error, null, JSON.stringify(result)); else assert.ok(result.error, JSON.stringify(result));

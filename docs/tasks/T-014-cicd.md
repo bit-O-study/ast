@@ -26,3 +26,5 @@
 
 - 첫 GitHub 실행 40198452151: 테스트 170 통과/3 실패, 배포 skipped로 서버 무변경. GitHub Windows 임시 경로의 8.3 표기와 .NET 경로 정규화 차이를 확인해 배포 경로 비교를 정규화하고 짧은 경로 회귀 테스트를 추가했다.
 - 서버 AST 작업의 기존 인자가 기본 경로에 의존하여 -ProjectRoot C:\ast를 명시하도록 Action만 갱신. PID 5852 유지. 설치기의 UpdateExisting은 트리거만 갱신하므로 Action은 검증 후 Set-ScheduledTask로 변경했다.
+
+- 두 번째 GitHub CI는 경로 검증을 통과했지만 pwsh에서 Windows PowerShell을 실행할 때 상속된 PSModulePath 때문에 Get-FileHash 자동 로드에 실패했다. CI 기본 셸을 서버와 같은 Windows PowerShell로 지정하고 격리 테스트 자식 프로세스에서 PSModulePath를 초기화한다. 배포는 다시 skipped, 서버 중지 없음.
