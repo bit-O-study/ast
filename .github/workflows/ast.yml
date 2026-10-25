@@ -51,7 +51,7 @@ jobs:
           RELEASE_SHA: ${{ github.sha }}
         run: |
           $head = Invoke-RestMethod -Uri https://api.github.com/repos/bit-O-study/ast/commits/main -Headers @{Authorization="Bearer $env:GH_TOKEN";Accept="application/vnd.github+json"} -TimeoutSec 30
-          if ($head.sha -ne $env:RELEASE_SHA) { throw '최신 main이 아닌 배포를 중단합니다.' }
+          if ($head.sha -ne $env:RELEASE_SHA) { throw ([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('7LWc7IugIG1haW7snbQg7JWE64uMIOuwsO2PrOulvCDspJHri6jtlanri4jri6Qu'))) }
       - uses: actions/download-artifact@v4
         with:
           name: ast-paper-release
