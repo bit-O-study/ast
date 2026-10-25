@@ -1,0 +1,61 @@
+name: AST CI and paper deployment
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ast-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  test:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm test
+      - name: Package tested runtime
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        shell: pwsh
+        run: node scripts/deploy/package.mjs "$env:RUNNER_TEMP/ast-release-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT"
+      - uses: actions/upload-artifact@v4
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        with:
+          name: ast-paper-release
+          path: ${{ runner.temp }}/ast-release-${{ github.run_id }}-${{ github.run_attempt }}
+          if-no-files-found: error
+          retention-days: 7
+  deploy:
+    needs: test
+    if: github.repository == 'bit-O-study/ast' && github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: [self-hosted, Windows, X64, bito-ast]
+    timeout-minutes: 20
+    steps:
+      - name: Confirm current main
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_SHA: ${{ github.sha }}
+        run: |
+          $head = Invoke-RestMethod -Uri https://api.github.com/repos/bit-O-study/ast/commits/main -Headers @{Authorization="Bearer $env:GH_TOKEN";Accept="application/vnd.github+json"} -TimeoutSec 30
+          if ($head.sha -ne $env:RELEASE_SHA) { throw '최신 main이 아닌 배포를 중단합니다.' }
+      - uses: actions/download-artifact@v4
+        with:
+          name: ast-paper-release
+          path: ${{ runner.temp }}/ast-release-${{ github.run_id }}-${{ github.run_attempt }}
+      - name: Deploy paper and verify
+        shell: powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
+        env:
+          RELEASE_SHA: ${{ github.sha }}
+          RELEASE_DIR: ${{ runner.temp }}/ast-release-${{ github.run_id }}-${{ github.run_attempt }}
+        run: '& C:/services/Bit-O/ast/tools/deploy-paper.ps1 -Release $env:RELEASE_DIR -Sha $env:RELEASE_SHA'

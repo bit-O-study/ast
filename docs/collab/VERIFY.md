@@ -72,6 +72,8 @@
 | 2026-10-25 | T-009B 전략 메타데이터 | V2 | BTC 17/ETH 16/XRP 20건 진입·청산 경로 100% 일치, 오류 0 | docs/verify/2026-10-25_KRW-*_240_score_btc.md |
 | 2026-10-25 | T-009B 서버 반영 | V4 HTTP + V3 진행 | 해시 6개 일치, PID 5852/paper 오류 0. 신규 봉 관측 running/1회, 다음 마감 결과 대기 | 서버 logs/paper-observation.json, T-009B 작업 로그 |
 
+| 2026-10-25 | T-014 CI/CD | V1 | 전체 173/173 통과, 배포 성공·거부·복구 포함 13개 신규 검증 | test/deploy*.test.js, logs/cicd-all-tests.log |
+
 ## 검증으로 찾은 문제
 
 | 날짜 | 발견 | 조치 |
