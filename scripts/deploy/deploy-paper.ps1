@@ -7,8 +7,8 @@
 )
 $ErrorActionPreference='Stop'
 $ProgressPreference='SilentlyContinue'
-$ProjectRoot=(Resolve-Path -LiteralPath $ProjectRoot).Path
-$Release=(Resolve-Path -LiteralPath $Release).Path
+$ProjectRoot=[IO.Path]::GetFullPath((Resolve-Path -LiteralPath $ProjectRoot).Path).TrimEnd('\')
+$Release=[IO.Path]::GetFullPath((Resolve-Path -LiteralPath $Release).Path).TrimEnd('\')
 if ($Release -eq $ProjectRoot) { throw '운영 경로를 배포 원본으로 쓸 수 없습니다.' }
 $mutex=[Threading.Mutex]::new($false,'Global\AST-Deploy-'+$TaskName)
 $owned=$false
@@ -71,9 +71,10 @@ try {
   if (@($all|Where-Object { $_.Attributes -band [IO.FileAttributes]::ReparsePoint }).Count) { throw '링크 경로는 허용하지 않습니다.' }
   if (@($all|Where-Object { !$_.PSIsContainer }).Count -ne $seen.Count+1) { throw '목록에 없는 파일이 있습니다.' }
   $task=Get-ScheduledTask -TaskName $TaskName
-  $runnerPath=Join-Path $ProjectRoot 'scripts\server\run-paper.ps1'
-  $expected='-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "'+$runnerPath+'" -ProjectRoot "'+$ProjectRoot+'"'
-  if ($task.State -ne 'Running' -or @($task.Actions).Count -ne 1 -or $task.Actions[0].Arguments -ne $expected -or $task.Actions[0].WorkingDirectory -ne $ProjectRoot) { throw 'AST 예약 작업 설정이 예상과 다릅니다.' }
+  $configuredRoot=$task.Actions[0].WorkingDirectory
+  $runnerPath=Join-Path $configuredRoot 'scripts\server\run-paper.ps1'
+  $expected='-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "'+$runnerPath+'" -ProjectRoot "'+$configuredRoot+'"'
+  if ($task.State -ne 'Running' -or @($task.Actions).Count -ne 1 -or $task.Actions[0].Arguments -ne $expected -or [IO.Path]::GetFullPath($configuredRoot).TrimEnd('\') -ne $ProjectRoot) { throw 'AST 예약 작업 설정이 예상과 다릅니다.' }
   $before=Read-Status
   Assert-Paper $before
   $originalHalted=$before.halted

@@ -23,3 +23,6 @@
 
 - 로컬 전체 npm test 173/173 통과. 신규 배포 검증 13개: 성공/기존 정지/보유/실거래/해시 변조/경로 이탈/추가 파일/건강 실패 복구/일시정지 중 포지션 생성/작업 불일치/종료 실패/패키지 격리. 초기 모의 함수 switch 인자와 PowerShell 동적 변수 범위 충돌을 수정 후 통과.
 - AST 전용 runner 2.338.1 설치, 공식 SHA256 대조, GitHub runner id=2 online. 전용 서비스 Running 및 자동 시작. 다른 프로젝트 러너 수정 없음.
+
+- 첫 GitHub 실행 40198452151: 테스트 170 통과/3 실패, 배포 skipped로 서버 무변경. GitHub Windows 임시 경로의 8.3 표기와 .NET 경로 정규화 차이를 확인해 배포 경로 비교를 정규화하고 짧은 경로 회귀 테스트를 추가했다.
+- 서버 AST 작업의 기존 인자가 기본 경로에 의존하여 -ProjectRoot C:\ast를 명시하도록 Action만 갱신. PID 5852 유지. 설치기의 UpdateExisting은 트리거만 갱신하므로 Action은 검증 후 Set-ScheduledTask로 변경했다.

@@ -8,7 +8,7 @@ import { promisify } from 'node:util';
 import { packageRelease } from '../scripts/deploy/package.mjs';
 const exec = promisify(execFile);
 const quote = s => "'" + s.replaceAll("'", "''") + "'";
-for (const scenario of ['success', 'halted', 'position', 'live', 'hash', 'path', 'extra', 'rollback', 'race', 'task', 'stop']) {
+for (const scenario of ['success', 'short', 'halted', 'position', 'live', 'hash', 'path', 'extra', 'rollback', 'race', 'task', 'stop']) {
   test('배포 격리 PowerShell: ' + scenario, { skip: process.platform !== 'win32', timeout: 60000 }, async t => {
     const base = await mkdtemp(join(tmpdir(), 'ast-deploy-server-'));
     t.after(async () => { assert.ok(base.startsWith(join(tmpdir(), 'ast-deploy-server-'))); await rm(base, { recursive: true, force: true }); });
@@ -48,14 +48,16 @@ for (const scenario of ['success', 'halted', 'position', 'live', 'hash', 'path',
       "function Get-NetTCPConnection {param($LocalPort,$State,$ErrorAction) if ($global:running) {return @{OwningProcess=1}}}",
       "function Start-Sleep {param($Seconds)}",
       "$errorText=$null",
-      "try { & " + quote(resolve('scripts/deploy/deploy-paper.ps1')) + " -Release " + quote(release) + " -ProjectRoot " + quote(live) + " -Sha " + quote(sha) + " -TaskName AST-Test-Deploy -HealthAttempts 1 } catch {$errorText=$_.Exception.Message}",
+      "$releasePath=" + quote(release),
+      "if ($scenario -eq 'short') {$releasePath=(New-Object -ComObject Scripting.FileSystemObject).GetFolder($releasePath).ShortPath}",
+      "try { & " + quote(resolve('scripts/deploy/deploy-paper.ps1')) + " -Release $releasePath -ProjectRoot " + quote(live) + " -Sha " + quote(sha) + " -TaskName AST-Test-Deploy -HealthAttempts 1 } catch {$errorText=$_.Exception.Message}",
       "@{error=$errorText;stops=$global:stops;running=$global:running;halted=$global:state.halted;controls=@($global:controls)}|ConvertTo-Json -Depth 5|Set-Content -Encoding UTF8 -LiteralPath " + quote(out),
     ].join('\r\n');
     const wrapper = join(base, 'test.ps1');
     await writeFile(wrapper, '\uFEFF' + script);
     await exec('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', wrapper], { windowsHide: true, timeout: 50000 });
     const result = JSON.parse((await readFile(out, 'utf8')).replace(/^\uFEFF/, ''));
-    const success = ['success', 'halted'].includes(scenario);
+    const success = ['success', 'short', 'halted'].includes(scenario);
     if (success) assert.equal(result.error, null, JSON.stringify(result)); else assert.ok(result.error, JSON.stringify(result));
     assert.equal(await readFile(join(live, 'src/index.js'), 'utf8'), success ? 'new' : 'old');
     assert.equal(await readFile(join(live, '.env'), 'utf8'), 'old');
