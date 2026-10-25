@@ -28,3 +28,5 @@
 - 서버 AST 작업의 기존 인자가 기본 경로에 의존하여 -ProjectRoot C:\ast를 명시하도록 Action만 갱신. PID 5852 유지. 설치기의 UpdateExisting은 트리거만 갱신하므로 Action은 검증 후 Set-ScheduledTask로 변경했다.
 
 - 두 번째 GitHub CI는 경로 검증을 통과했지만 pwsh에서 Windows PowerShell을 실행할 때 상속된 PSModulePath 때문에 Get-FileHash 자동 로드에 실패했다. CI 기본 셸을 서버와 같은 Windows PowerShell로 지정하고 격리 테스트 자식 프로세스에서 PSModulePath를 초기화한다. 배포는 다시 skipped, 서버 중지 없음.
+
+- 실행 40199582969에서 GitHub test 성공 및 패키지 업로드 성공. 배포 준비 단계는 서버 기본 PowerShell 실행 정책으로 차단됐다. 머신 정책 변경 없이 해당 단계만 ExecutionPolicy Bypass로 실행하도록 수정한다. 앱 중지/교체 단계는 실행되지 않았다.
