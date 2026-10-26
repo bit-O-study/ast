@@ -246,6 +246,7 @@ try {
       });
       await check('연월 직접 선택과 입력 오류 및 전략 유지', async () => {
         const input = page.locator('#perf-month-input');
+        try {
         await page.locator('#perf-strategy').selectOption(JSON.stringify('score'));
         await input.fill('2024-02');
         await input.dispatchEvent('change');
@@ -253,11 +254,29 @@ try {
         assert.equal(await page.locator('#perf-calendar button').count(), 29);
         assert.equal(await page.locator('[data-day="2024-02-01"]').getAttribute('aria-pressed'), 'true');
         assert.equal(await page.locator('#perf-strategy').inputValue(), JSON.stringify('score'));
+        await input.focus();
+        await input.evaluate(el => { el.value = '2024-03'; el.dispatchEvent(new Event('input', { bubbles: true })); });
+        await page.evaluate(() => loadLists());
+        assert.equal(await input.inputValue(), '2024-03');
+        assert.equal(await page.locator('#perf-month').textContent(), '2024년 2월');
+        await input.dispatchEvent('change');
+        await input.blur();
+        assert.equal(await page.locator('#perf-month').textContent(), '2024년 3월');
+        await page.locator('#perf-prev').click();
+        assert.equal(await input.inputValue(), '2024-02');
         await input.fill('');
         await input.dispatchEvent('change');
+        await input.blur();
         assert.equal(await input.getAttribute('aria-invalid'), 'true');
         assert.equal(await page.locator('#perf-month-error').isVisible(), true);
+        await page.locator('#perf-strategy').selectOption('');
+        assert.equal(await input.inputValue(), '');
+        assert.equal(await page.locator('#perf-month-error').isVisible(), true);
         assert.equal(await page.locator('#perf-month').textContent(), '2024년 2월');
+        await page.evaluate(() => loadLists());
+        assert.equal(await input.inputValue(), '', '조회 갱신이 편집 중인 월을 덮어쓰면 안 됨');
+        assert.equal(await input.getAttribute('aria-invalid'), 'true');
+        assert.equal(await page.locator('#perf-month-error').isVisible(), true);
         await input.fill('1969-12');
         await input.dispatchEvent('change');
         assert.equal(await input.getAttribute('aria-invalid'), 'true');
@@ -269,6 +288,10 @@ try {
         assert.equal(await input.inputValue(), '2026-10');
         await page.locator('#perf-strategy').selectOption('');
         assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+        } finally {
+          await page.locator('#perf-today').click();
+          await page.locator('#perf-strategy').selectOption('');
+        }
       });
       await check('빈 날짜와 빈 월 및 이번 달 이동', async () => {
         await page.locator('[data-day="2026-10-01"]').click();

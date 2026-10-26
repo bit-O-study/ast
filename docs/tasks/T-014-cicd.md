@@ -19,6 +19,9 @@
 - V3 관측 재시작 여부를 기록하고 새 봉 결과를 과거 결과로 대체하지 않는다.
 
 ## 작업 로그
+- 2026-10-26 오늘 변경 반영 완료: main `6632c122f39d7eba4089a43ea072f642d419eef4`, [실행 40256242473](https://github.com/bit-O-study/ast/actions/runs/40256242473) test/deploy 모두 success. 서버 release.json SHA 일치. HTTP 200 및 실제 제공 HTML/JS의 전략 필터·연월 입력·PF 함수 확인. 사용자 AGENTS.md 변경/로그는 커밋 제외, 터널 PID3276 유지.
+- 배포 후 UTC 1792980503084: paper, 잔고 10,000,000원/coin=0/무포지션, 오류·경고 0. 새 봉 관측 running/32회, nextCandleAt=1792983603000(2026-10-26 12:00:03 KST). 새 관측은 아직 통과가 아니며 이전 passed 기록과 구분한다. 상태 리뷰 대기.
+- 실서비스 브라우저 캡처를 포함한 별도 검증 명령은 권한 확장 대기 중 턴이 중단되어 실행 결과가 없다. 배포 전 격리 브라우저 168/168, 배포 후 HTTP/JS 및 운영 상태 확인을 근거로 사용한다. 새 실서비스 캡처 성공을 주장하지 않는다.
 - 2026-10-26 재확인: 이전 실행 [40200229994](https://github.com/bit-O-study/ast/actions/runs/40200229994)의 test/deploy 모두 success. 배포 SHA c9e8f2966c7e0ecd602bfb6daff5385a67bf6fcf가 서버 release.json과 일치했다. 전용 runner bito-server-ast online/idle. 기존 미완료 표시는 결과 미기록이었다.
 - UTC 1792979220761 서버 점검: paper, 잔고 10,000,000원/coin=0/무포지션, 오류·경고 0. 기존 봉 관측 passed 117회. 부모가 생성한 localhost:8788 SSH 터널은 유지한다.
 - 사용자 지속 개발 및 기존 main 반영/CI/CD 위임에 따라 오늘 검증된 성과 UI 3개 후속을 main으로 전달한다. 커밋 직전 paper/무포지션을 재확인하고 배포기의 신규 진입 중단/재확인/복구 절차를 사용한다. 기존 AGENTS.md 사용자 변경과 logs는 커밋하지 않는다.

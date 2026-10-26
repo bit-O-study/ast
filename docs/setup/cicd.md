@@ -22,6 +22,8 @@
 동시 배포는 workflow concurrency 및 서버 mutex로 막는다. 보유 포지션/실거래/킬 스위치/현재 오류가 있으면 자동으로 청산하거나 중지하지 않고 해당 배포를 실패 처리한다. 포지션 정리 이후 Actions에서 최신 main을 수동 실행한다. 사용자 일시정지는 배포 후에도 유지한다. 운영 데이터는 롤백하지 않는다.
 
 ## 확인 및 재실행
+2026-10-26 후속: [실행 40256242473](https://github.com/bit-O-study/ast/actions/runs/40256242473)에서 성과 화면 후속 `6632c122f39d7eba4089a43ea072f642d419eef4`의 test/deploy 모두 성공. 서버 SHA·HTTP 새 기능 일치 및 paper/무포지션/오류·경고 0 확인. 새 봉 관측은 진행 중이다.
+
 2026-10-26 확인: [실행 40200229994](https://github.com/bit-O-study/ast/actions/runs/40200229994)의 test/deploy 모두 성공했고 서버 release SHA는 `c9e8f2966c7e0ecd602bfb6daff5385a67bf6fcf`와 일치했다. 전용 러너 online, paper/무포지션, 오류·경고 0. 이전 실패 로그 이후의 실제 성공을 확인했다.
 
 GitHub 저장소 Actions → AST CI and paper deployment → 실행 결과의 test/deploy 둘 다 success인지 확인한다. 실패한 테스트는 서버 배포를 실행하지 않는다. 보유 중 거부는 무포지션 이후 Run workflow(main)로 재실행한다.

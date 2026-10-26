@@ -350,7 +350,7 @@ const control = async (action) => {
 
 // ───────── 청산일 기준 성과 ─────────
 let performanceTools = null, performanceError = false;
-const performanceState = { month: kst(Date.now(), true).slice(0, 7), day: kst(Date.now(), true).slice(0, 10), loaded: false, count: 0, strategy: undefined };
+const performanceState = { month: kst(Date.now(), true).slice(0, 7), day: kst(Date.now(), true).slice(0, 10), loaded: false, count: 0, strategy: undefined, monthDraft: false };
 import('/performance.js').then(module => { performanceTools = module; renderPerformance(); }).catch(() => {
   performanceError = true; renderPerformance();
 });
@@ -402,9 +402,11 @@ function renderPerformance() {
   updatePerformanceExport();
   $('#perf-month').textContent = `${month.year}년 ${month.number}월`;
   $('#perf-month-input').disabled = false;
-  $('#perf-month-input').value = month.month;
-  $('#perf-month-input').removeAttribute('aria-invalid');
-  $('#perf-month-error').hidden = true;
+  if (!performanceState.monthDraft) {
+    $('#perf-month-input').value = month.month;
+    $('#perf-month-input').removeAttribute('aria-invalid');
+    $('#perf-month-error').hidden = true;
+  }
   $('#perf-prev').disabled = month.month === '1970-01';
   $('#perf-next').disabled = month.month === '9999-12';
   state.textContent = select.selectedOptions[0].textContent + ' · ' + (summary.count ? `이번 달 청산 거래 ${summary.count}건` : '이번 달 청산된 거래가 없습니다.') + (month.invalid ? ` · 날짜나 손익을 확인할 수 없는 기록 ${month.invalid}건은 집계에서 제외했습니다.` : '');
@@ -438,10 +440,13 @@ $('#perf-strategy').onchange = e => {
   $('#perf-export-status').hidden = true;
   renderPerformance();
 };
+$('#perf-month-input').oninput = () => { performanceState.monthDraft = true; };
 $('#perf-month-input').onchange = e => {
   if (!performanceTools) return;
+  performanceState.monthDraft = true;
   try {
     performanceTools.monthInfo(e.target.value);
+    performanceState.monthDraft = false;
     performanceState.month = e.target.value;
     performanceState.day = e.target.value + '-01';
     renderPerformance();
@@ -453,6 +458,7 @@ $('#perf-month-input').onchange = e => {
 };
 function changePerformanceMonth(delta) {
   if (!performanceTools) return;
+  performanceState.monthDraft = false;
   performanceState.month = performanceTools.shiftMonth(performanceState.month, delta);
   performanceState.day = performanceState.month + '-01';
   renderPerformance();
@@ -460,6 +466,7 @@ function changePerformanceMonth(delta) {
 $('#perf-prev').onclick = () => changePerformanceMonth(-1);
 $('#perf-next').onclick = () => changePerformanceMonth(1);
 $('#perf-today').onclick = () => {
+  performanceState.monthDraft = false;
   performanceState.day = kst(Date.now(), true).slice(0, 10);
   performanceState.month = performanceState.day.slice(0, 7);
   renderPerformance();
@@ -467,6 +474,7 @@ $('#perf-today').onclick = () => {
 $('#perf-calendar').onclick = e => {
   const button = e.target.closest('button[data-day]');
   if (!button) return;
+  performanceState.monthDraft = false;
   performanceState.day = button.dataset.day;
   renderPerformance();
 };
@@ -482,6 +490,7 @@ $('#perf-calendar').onkeydown = e => {
   else if (e.key === 'End') next = day.slice(0, 7) + '-' + performanceTools.monthInfo(day.slice(0, 7)).length;
   else return;
   e.preventDefault();
+  performanceState.monthDraft = false;
   performanceState.day = next; performanceState.month = next.slice(0, 7);
   renderPerformance();
   $('#perf-calendar').querySelector('[data-day="' + next + '"]')?.focus({ preventScroll: true });

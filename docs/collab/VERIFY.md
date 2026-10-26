@@ -18,6 +18,8 @@
 
 | 날짜 | 작업 | 단계 | 결과 | 근거 |
 |---|---|---|---|---|
+| 2026-10-26 | T-009B 연월 편집 보존 | V1 + 격리 Chromium | 전체 180/180, 브라우저 168/168 통과. 초안/오류 갱신 보존·blur·전략 필터·유효 월 및 명시적 이동 검증 | logs/strategy-filter-tests-unrestricted.log, logs/dashboard-check/month-draft-before.json, result.json |
+| 2026-10-26 | T-009B 후속/T-014 main 배포 | V4 HTTP + 새 V3 진행 | Actions 40256242473 test/deploy success, 서버 SHA 6632c12 일치, HTTP200 및 새 UI 코드 확인. paper/무포지션/오류·경고 0, 새 관측 running/32회 | 서버 release.json/check-paper.mjs, localhost8788 HTML/JS |
 | 2026-10-26 | T-009B 연월 직접 선택 | V1 + 격리 Chromium | 전체 180/180, 브라우저 168/168 통과. 윤년/빈 입력/범위 오류/기존 이동·필터 동기화 확인 | logs/strategy-filter-tests-unrestricted.log, logs/dashboard-check/result.json |
 | 2026-10-26 | T-014 기존 배포 재확인 | V4 + 기존 V3 | Actions 40200229994 test/deploy success, 서버 release SHA c9e8f296 일치. paper/무포지션/오류·경고 0, 기존 봉 관측 passed 117회 | GitHub Actions, 서버 check-paper.mjs/release.json/paper-observation.json |
 | 2026-10-26 | T-009B 전략 성과 지표 | V1 + 격리 Chromium | 전용 21/21, 전체 180/180, 브라우저 162/162 통과. 승률/평균/PF·무손실·0원·필터/월 경계 검증 | logs/strategy-metrics-tests.log, logs/dashboard-check/result.json |
@@ -82,6 +84,7 @@
 
 | 날짜 | 발견 | 조치 |
 |---|---|---|
+| 2026-10-26 | 10초 거래 조회 갱신이 편집 중 연월과 입력 오류를 덮어씀. 6개 화면 조합 모두 재현 | 입력 초안과 적용 월 분리. 조회/필터 변경 시 보존, 유효 입력/명시적 날짜 이동 시 동기화. 브라우저 168/168 통과, month-draft-before.json에 재현 기록 보존 |
 | 2026-10-26 | 전략 필터의 긴 선택지 이름 때문에 320px 화면에서 가로 넘침 | 필터 패널 최소 너비 및 select 너비 지정. 3개 폭×2개 테마 브라우저 162/162 통과 |
 | 2026-10-26 | 샌드박스 전체 테스트에서 Windows 실행기 2개가 대기 초과. 프로세스 조회 Get-CimInstance가 Access Denied(0x80041003) | 제품/테스트 코드를 변경하지 않고 승인된 권한 확장 전체 검증으로 재확인 |
 | 2026-10-23 | 1차 목표 일부 매도 후 같은 봉에서 본전 손절가 아래로 내려오면, 실매매는 그 봉에서 팔고 백테스트는 다음 봉에서 팔았음 | 백테스트를 실매매에 맞춤 (`src/backtest.js`) |

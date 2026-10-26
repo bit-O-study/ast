@@ -59,6 +59,8 @@ ssh <계정>@<서버IP> hostname   # 접속 확인용 한 줄 실행
 
 ## 변경 기록
 
+2026-10-26: Codex가 기존 main CI/CD 경로로 성과 UI 후속을 배포했다. Actions 40256242473 test/deploy success, 서버 release SHA 6632c122f39d7eba4089a43ea072f642d419eef4 일치. 배포 전후 paper/무포지션 확인. UTC 1792980503084 점검에서 오류·경고 0, 새 봉 관측 running/32회(12:00:03 KST 마감 목표). 부모가 만든 개발 PC SSH 터널 PID3276/localhost8788은 유지했다. 실거래/API 키/방화벽 변경 없음.
+
 | 날짜 | 누가 | 변경 |
 |---|---|---|
 | 2026-10-23 | 사용자 | 개발 PC에서 SSH 키(`ast-claude`) 생성, 서버에 OpenSSH 설치 시작 |
