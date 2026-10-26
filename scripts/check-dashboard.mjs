@@ -22,6 +22,7 @@ try {
       await page.addInitScript(at => { Date.now = () => at; }, now);
       const errors = [], actions = [];
       const fail = new Set();
+      const networkFail = new Set();
       let controlDelay = 0;
       page.on('pageerror', e => errors.push(e.message));
       const status = { mode: 'paper', broker: '모의투자', market: 'KRW-BTC', unit: 240, price: 100800000, nextCandleAt: now + 14400000, halted: false, killed: false, config: { entryScore: 50, exitScore: 40, t1SellRatio: .5 }, summary: stats, balance: { krw: 10000000, coin: 0 }, position: null, signal: null };
@@ -29,6 +30,7 @@ try {
         const url = new URL(route.request().url());
         if (url.hostname !== 'dashboard.test') return route.abort();
         if (url.pathname.startsWith('/api/')) {
+          if (networkFail.has(url.pathname)) return route.abort('internetdisconnected');
           if (fail.has(url.pathname)) return route.fulfill({ status: 503, json: { error: '검증용 서버 오류' } });
           if (url.pathname === '/api/control' && controlDelay) await new Promise(r => setTimeout(r, controlDelay));
           let body;
@@ -315,6 +317,41 @@ try {
         assert.equal(await page.locator('#connection-status').isVisible(), false);
         assert.equal(await page.locator('[data-day="2026-10-25"]').getAttribute('aria-pressed'), 'true');
       });
+      await check('성과 영역에서 오래된 기록과 조회 실패를 구분', async () => {
+        try {
+          fail.add('/api/trades');
+          await page.evaluate(() => loadLists());
+          const localNotice = await page.locator('#view-performance').textContent();
+          assert.ok(localNotice.includes('갱신 실패'), '성과 영역에도 조회 실패를 표시해야 함');
+          assert.ok(localNotice.includes('마지막 조회 성공'), '마지막 성공 시각을 표시해야 함');
+          assert.ok(localNotice.includes('최신이 아닐 수 있습니다'));
+          assert.equal(await page.locator('#perf-freshness').getAttribute('role'), 'status');
+          assert.equal(await page.locator('#perf-export').isDisabled(), true);
+        } finally {
+          fail.clear();
+          await page.evaluate(() => loadLists());
+        }
+        assert.ok(!(await page.locator('#perf-freshness').textContent()).includes('갱신 실패'));
+        assert.ok((await page.locator('#perf-freshness').textContent()).includes('마지막 조회 성공'));
+        assert.equal(await page.locator('#perf-export').isDisabled(), false);
+      });
+      await check('성과 네트워크 단절과 복구는 이전 합계와 갱신 상태를 구분', async () => {
+        try {
+          networkFail.add('/api/trades');
+          await page.evaluate(() => loadLists());
+          assert.ok((await page.locator('#perf-summary').textContent()).includes('+5,000원'));
+          assert.ok((await page.locator('#perf-freshness').textContent()).includes('갱신 실패'));
+          assert.equal(await page.locator('#perf-export').isDisabled(), true);
+          await page.locator('#perf-prev').click();
+          assert.ok((await page.locator('#perf-freshness').textContent()).includes('갱신 실패'));
+        } finally {
+          networkFail.clear();
+          await page.evaluate(() => loadLists());
+          await page.locator('#perf-today').click();
+        }
+        assert.ok(!(await page.locator('#perf-freshness').textContent()).includes('갱신 실패'));
+        assert.equal(await page.locator('#perf-export').isDisabled(), false);
+      });
       await check('최초 거래 조회 실패를 빈 월로 표시하지 않음', async () => {
         fail.add('/api/trades');
         await page.reload();
@@ -323,6 +360,8 @@ try {
         assert.equal(await page.locator('#perf-content').isVisible(), false);
         assert.equal(await page.locator('#perf-export').isDisabled(), true);
         assert.ok(!(await page.locator('#perf-state').textContent()).includes('청산된 거래가 없습니다'));
+        assert.ok((await page.locator('#perf-state').textContent()).includes('아직 받지 못했습니다'));
+        assert.ok((await page.locator('#perf-freshness').textContent()).includes('아직 받은 데이터 없음'));
         fail.clear();
         await page.evaluate(() => loadLists());
         await page.waitForSelector('#perf-calendar button');

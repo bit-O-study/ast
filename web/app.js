@@ -32,7 +32,7 @@ const loading = new Set(), failures = new Map(), updated = new Map();
 async function refresh(key, label, action) {
   if (loading.has(key)) return;
   loading.add(key);
-  if (key === 'trades') updatePerformanceExport();
+  if (key === 'trades') { updatePerformanceExport(); updatePerformanceFreshness(); }
   try {
     await action(); updated.set(key, Date.now()); failures.delete(key);
   } catch {
@@ -40,7 +40,7 @@ async function refresh(key, label, action) {
     if (key === 'status') $('#run-state').textContent = '서버 연결 끊김';
   } finally {
     loading.delete(key);
-    if (key === 'trades') updatePerformanceExport();
+    if (key === 'trades') { updatePerformanceExport(); updatePerformanceFreshness(); }
     const notice = $('#connection-status');
     notice.hidden = failures.size === 0;
     notice.textContent = [...failures].map(([id, name]) => name + ' 갱신 실패 · ' + (updated.has(id) ? '마지막 성공 ' + kst(updated.get(id), true) + ' KST' : '아직 받은 데이터 없음')).join(' / ') + (failures.size ? ' · 자동으로 다시 확인합니다. 표시된 값은 최신이 아닐 수 있습니다.' : '');
@@ -358,6 +358,20 @@ import('/performance.js').then(module => { performanceTools = module; renderPerf
 function updatePerformanceExport() {
   $('#perf-export').disabled = !performanceTools || !performanceState.loaded || !performanceState.count || loading.has('trades') || failures.has('trades');
 }
+function updatePerformanceFreshness() {
+  const failed = failures.has('trades');
+  const last = updated.has('trades') ? '마지막 조회 성공 ' + kst(updated.get('trades'), true) + ' KST' : '아직 받은 데이터 없음';
+  const notice = $('#perf-freshness');
+  notice.hidden = !failed && !updated.has('trades');
+  notice.classList.toggle('alert', failed);
+  notice.textContent = failed
+    ? '거래 기록 갱신 실패 · ' + last + (performanceState.loaded ? ' · 표시된 기록은 최신이 아닐 수 있습니다.' : '.') + ' 자동으로 다시 확인합니다.'
+    : last + (loading.has('trades') ? ' · 새 기록을 확인하는 중입니다.' : '');
+  if (!performanceTools || !performanceState.loaded) {
+    $('#perf-state').textContent = performanceError ? '성과 화면을 불러오지 못했습니다. 새로고침해 주세요.'
+      : failed ? '거래 기록을 아직 받지 못했습니다. 연결이 복구되면 다시 표시합니다.' : '거래 기록을 불러오는 중입니다.';
+  }
+}
 $('#perf-export').onclick = () => {
   if ($('#perf-export').disabled) return;
   const notice = $('#perf-export-status');
@@ -381,11 +395,11 @@ $('#perf-export').onclick = () => {
 };
 
 function renderPerformance() {
+  updatePerformanceFreshness();
   const state = $('#perf-state');
   const ready = performanceTools && performanceState.loaded;
   $('#perf-content').hidden = !ready;
   if (!ready) {
-    state.textContent = performanceError ? '성과 화면을 불러오지 못했습니다. 새로고침해 주세요.' : '거래 기록을 불러오는 중입니다.';
     return;
   }
   const select = $('#perf-strategy');
