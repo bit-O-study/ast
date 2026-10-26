@@ -18,6 +18,10 @@
 
 | 날짜 | 작업 | 단계 | 결과 | 근거 |
 |---|---|---|---|---|
+| 2026-10-26 | T-009B 연월 직접 선택 | V1 + 격리 Chromium | 전체 180/180, 브라우저 168/168 통과. 윤년/빈 입력/범위 오류/기존 이동·필터 동기화 확인 | logs/strategy-filter-tests-unrestricted.log, logs/dashboard-check/result.json |
+| 2026-10-26 | T-014 기존 배포 재확인 | V4 + 기존 V3 | Actions 40200229994 test/deploy success, 서버 release SHA c9e8f296 일치. paper/무포지션/오류·경고 0, 기존 봉 관측 passed 117회 | GitHub Actions, 서버 check-paper.mjs/release.json/paper-observation.json |
+| 2026-10-26 | T-009B 전략 성과 지표 | V1 + 격리 Chromium | 전용 21/21, 전체 180/180, 브라우저 162/162 통과. 승률/평균/PF·무손실·0원·필터/월 경계 검증 | logs/strategy-metrics-tests.log, logs/dashboard-check/result.json |
+| 2026-10-26 | T-009B 전략 필터 | V1 + 격리 Chromium | 전용 18/18, 전체 177/177, 브라우저 162/162 통과. 월 이동/조회 갱신 유지·미상/ID 충돌·필터 CSV·모바일 확인 | logs/strategy-filter-tests-unrestricted.log, logs/dashboard-check/result.json |
 | 2026-10-23 | T-000 이벤트 구독 | V1 | 통과 | `test/store.test.js` |
 | 2026-10-23 | T-001 전략 구조 + BTC 국면 필터 | V1 | 통과 | `test/regime.test.js`, `test/strategies.test.js`, `test/backtest.test.js` |
 | 2026-10-23 | T-001 전략 구조 + BTC 국면 필터 | V2 | 통과 (BTC·ETH·XRP 4h, BTC 1h, 돌파 전략, 필터 끔 모두 진입·청산 100% 일치, 오류 0) | `docs/verify/2026-10-23_*.md` |
@@ -78,6 +82,8 @@
 
 | 날짜 | 발견 | 조치 |
 |---|---|---|
+| 2026-10-26 | 전략 필터의 긴 선택지 이름 때문에 320px 화면에서 가로 넘침 | 필터 패널 최소 너비 및 select 너비 지정. 3개 폭×2개 테마 브라우저 162/162 통과 |
+| 2026-10-26 | 샌드박스 전체 테스트에서 Windows 실행기 2개가 대기 초과. 프로세스 조회 Get-CimInstance가 Access Denied(0x80041003) | 제품/테스트 코드를 변경하지 않고 승인된 권한 확장 전체 검증으로 재확인 |
 | 2026-10-23 | 1차 목표 일부 매도 후 같은 봉에서 본전 손절가 아래로 내려오면, 실매매는 그 봉에서 팔고 백테스트는 다음 봉에서 팔았음 | 백테스트를 실매매에 맞춤 (`src/backtest.js`) |
 | 2026-10-23 | 실매매 루프가 봉 마감 처리(손절가 조정)보다 현재가 확인을 먼저 해서, 갭 하락 시 갱신 전 손절가로 판단할 수 있었음 | 봉 마감 처리를 먼저 하도록 순서 변경 (`src/trader.js`) |
 | 2026-10-23 | 한 가격에서 1차·2차 목표가를 동시에 넘으면 실매매는 1차만 팔고 다음 확인까지 기다렸음 | 할 일이 없을 때까지 반복 처리 (`src/trader.js`) |

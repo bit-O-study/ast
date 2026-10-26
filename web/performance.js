@@ -77,17 +77,39 @@ export function recordedStrategy(trade) {
   return { id: s.id, name: typeof s.name === 'string' && s.name.trim() ? s.name : s.id };
 }
 
+// undefined는 전체, null은 미상으로 실제 문자열 ID와 구분합니다.
+export function filterStrategy(trades, id) {
+  if (!Array.isArray(trades)) throw new Error('거래 목록이 올바르지 않습니다.');
+  return id === undefined ? trades : trades.filter(trade => recordedStrategy(trade).id === id);
+}
+
+export function strategyChoices(trades) {
+  const groups = new Map();
+  for (const trade of [...trades].filter(t => kstDate(t?.exitAt) && Number.isFinite(t?.pnl)).sort((a, b) => b.exitAt - a.exitAt)) {
+    const strategy = recordedStrategy(trade);
+    if (!groups.has(strategy.id)) groups.set(strategy.id, strategy);
+  }
+  return [...groups.values()];
+}
+
 export function summarizeStrategies(trades, month) {
   const report = summarizeMonth(trades, month);
   const groups = new Map();
   for (const trade of report.days.flatMap(day => day.trades).sort((a, b) => b.exitAt - a.exitAt)) {
     const strategy = recordedStrategy(trade);
-    if (!groups.has(strategy.id)) groups.set(strategy.id, { ...strategy, count: 0, wins: 0, losses: 0, pnl: 0 });
+    if (!groups.has(strategy.id)) groups.set(strategy.id, { ...strategy, count: 0, wins: 0, losses: 0, pnl: 0, grossProfit: 0, grossLoss: 0 });
     const group = groups.get(strategy.id);
     group.count++; group.pnl += trade.pnl;
     if (trade.pnl > 0) group.wins++; else group.losses++;
+    if (trade.pnl > 0) group.grossProfit += trade.pnl;
+    if (trade.pnl < 0) group.grossLoss -= trade.pnl;
   }
-  return [...groups.values()];
+  return [...groups.values()].map(group => ({
+    ...group,
+    winRate: group.wins / group.count * 100,
+    averagePnl: group.pnl / group.count,
+    profitFactor: group.grossLoss > 0 ? group.grossProfit / group.grossLoss : null,
+  }));
 }
 
 export function monthlyCsv(trades, month) {

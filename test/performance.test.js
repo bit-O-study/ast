@@ -1,7 +1,48 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { kstDate, monthInfo, shiftMonth, shiftDay, monthlyCsv, summarizeMonth } from '../web/performance.js';
+import { kstDate, monthInfo, shiftMonth, shiftDay, monthlyCsv, summarizeMonth, summarizeStrategies, filterStrategy, strategyChoices } from '../web/performance.js';
 const trade = (at, pnl) => ({ exitAt: Date.parse(at), pnl });
+
+test('전략 필터는 전체·미상·동일 이름의 다른 ID와 예약어 ID를 구분한다', () => {
+  const list = [null, trade('2026-10-25T00:00:00Z', -1), ...['null', 'all', 'score', ''].map(id => ({ ...trade('2026-10-25T00:00:00Z', 2), strategy: { id, name: '같은 이름' } }))];
+  assert.equal(filterStrategy(list, undefined), list);
+  assert.equal(filterStrategy(list, null).length, 3);
+  for (const id of ['null', 'all', 'score']) {
+    const selected = filterStrategy(list, id);
+    assert.equal(selected.length, 1);
+    assert.equal(selected[0].strategy.id, id);
+  }
+  assert.deepEqual(filterStrategy(list, 'missing'), []);
+  assert.throws(() => filterStrategy(null, 'score'));
+});
+
+test('전략 선택지는 월 밖 최신 유효 기록을 사용하고 원본을 보존한다', () => {
+  const list = Object.freeze([
+    { ...trade('2026-10-25T00:00:00Z', 1), strategy: { id: 'score', name: '이전' } },
+    { ...trade('2026-11-25T00:00:00Z', 2), strategy: { id: 'score', name: '최신' } },
+    { exitAt: Infinity, pnl: 3, strategy: { id: 'bad' } },
+    { ...trade('2026-12-25T00:00:00Z', NaN), strategy: { id: 'score', name: '무효' } },
+    trade('2026-10-25T00:00:00Z', 0),
+  ]);
+  assert.deepEqual(strategyChoices(list), [{ id: 'score', name: '최신' }, { id: null, name: '전략 정보 없음' }]);
+  assert.equal(list[0].strategy.name, '이전');
+});
+
+test('전략 필터 뒤 달력과 CSV는 같은 KST 월과 빈 결과를 사용한다', () => {
+  const list = [
+    { ...trade('2026-10-31T14:59:59Z', 10), strategy: { id: 'score' } },
+    { ...trade('2026-10-31T15:00:00Z', 20), strategy: { id: 'score' } },
+    trade('2026-10-31T14:59:59Z', -30),
+  ];
+  for (const [id, month, pnl, count] of [['score', '2026-10', 10, 1], ['score', '2026-11', 20, 1], [null, '2026-10', -30, 1], ['missing', '2026-10', 0, 0]]) {
+    const filtered = filterStrategy(list, id);
+    const report = summarizeMonth(filtered, month), csv = monthlyCsv(filtered, month);
+    assert.equal(report.summary.pnl, pnl);
+    assert.equal(report.summary.count, count);
+    assert.equal(csv.count, count);
+    assert.equal(csv.csv.split('\r\n').length, count + 2);
+  }
+});
 
 test('KST 자정 전후와 월 경계로 청산일을 구분한다', () => {
   assert.equal(kstDate(Date.parse('2026-01-31T14:59:59.999Z')), '2026-01-31');
@@ -110,7 +151,7 @@ test('전략별 합계는 KST 월 합계와 같고 기존 기록은 추정하지
     trade('2026-09-30T14:59:59Z', 999), null,
   ];
   const groups = summarizeStrategies(list, '2026-10');
-  assert.deepEqual(groups.find(g => g.id === 'score'), { id: 'score', name: '최신', count: 2, wins: 1, losses: 1, pnl: 8 });
+  assert.deepEqual(groups.find(g => g.id === 'score'), { id: 'score', name: '최신', count: 2, wins: 1, losses: 1, pnl: 8, grossProfit: 10.5, grossLoss: 2.5, winRate: 50, averagePnl: 4, profitFactor: 4.2 });
   assert.equal(groups.find(g => g.id === null).name, '전략 정보 없음');
   for (const key of ['pnl', 'count', 'wins', 'losses']) assert.equal(groups.reduce((sum, g) => sum + g[key], 0), summarizeMonth(list, '2026-10').summary[key]);
   assert.deepEqual(summarizeStrategies([], '2026-10'), []);
@@ -123,4 +164,44 @@ test('전략 CSV는 저장 정보와 미상 값을 표시하며 수식을 중립
   assert.ok(r.csv.includes("'=1"));
   assert.ok(r.csv.includes("'+전략"));
   assert.ok(r.csv.includes('전략 정보 없음'));
+});
+
+test('전략 수익계수는 평균 이익/손실이 아닌 순이익 합/순손실 합이다', () => {
+  const list = [10, 30, -10, 0].map(pnl => ({ ...trade('2026-10-25T00:00:00Z', pnl), strategy: { id: 'score' } }));
+  const [group] = summarizeStrategies(list, '2026-10');
+  assert.equal(group.grossProfit, 40);
+  assert.equal(group.grossLoss, 10);
+  assert.equal(group.profitFactor, 4);
+  assert.equal(group.winRate, 50);
+  assert.equal(group.averagePnl, 7.5);
+  assert.equal(group.losses, 2); // 기존 실패 열은 0원을 포함합니다.
+  assert.equal(group.pnl, group.grossProfit - group.grossLoss);
+});
+
+test('전략 지표는 무손실·전부 손실·전부 0원·빈 월을 구분한다', () => {
+  for (const [values, expected] of [
+    [[10, 0], { winRate: 50, averagePnl: 5, profitFactor: null, grossProfit: 10, grossLoss: 0 }],
+    [[-10, -30], { winRate: 0, averagePnl: -20, profitFactor: 0, grossProfit: 0, grossLoss: 40 }],
+    [[0, 0], { winRate: 0, averagePnl: 0, profitFactor: null, grossProfit: 0, grossLoss: 0 }],
+  ]) {
+    const [group] = summarizeStrategies(values.map(pnl => trade('2026-10-25T00:00:00Z', pnl)), '2026-10');
+    for (const [key, value] of Object.entries(expected)) assert.equal(group[key], value);
+  }
+  assert.deepEqual(summarizeStrategies([], '2026-10'), []);
+});
+
+test('전략 지표는 필터·유효 청산·KST 월 범위를 따른다', () => {
+  const list = [
+    { ...trade('2026-10-31T14:59:59Z', 12.5), strategy: { id: 'score' } },
+    { ...trade('2026-10-31T15:00:00Z', -100), strategy: { id: 'score' } },
+    { ...trade('2026-10-31T14:59:59Z', NaN), strategy: { id: 'score' } },
+    trade('2026-10-31T14:59:59Z', -20),
+  ];
+  const filtered = filterStrategy(list, 'score');
+  const [group] = summarizeStrategies(filtered, '2026-10');
+  assert.equal(group.count, monthlyCsv(filtered, '2026-10').count);
+  assert.equal(group.averagePnl, 12.5);
+  assert.equal(group.winRate, 100);
+  assert.equal(group.profitFactor, null);
+  assert.equal(summarizeStrategies(filtered, '2026-11')[0].profitFactor, 0);
 });

@@ -350,7 +350,7 @@ const control = async (action) => {
 
 // ───────── 청산일 기준 성과 ─────────
 let performanceTools = null, performanceError = false;
-const performanceState = { month: kst(Date.now(), true).slice(0, 7), day: kst(Date.now(), true).slice(0, 10), loaded: false, count: 0 };
+const performanceState = { month: kst(Date.now(), true).slice(0, 7), day: kst(Date.now(), true).slice(0, 10), loaded: false, count: 0, strategy: undefined };
 import('/performance.js').then(module => { performanceTools = module; renderPerformance(); }).catch(() => {
   performanceError = true; renderPerformance();
 });
@@ -364,14 +364,14 @@ $('#perf-export').onclick = () => {
   notice.hidden = false;
   try {
     const month = performanceState.month;
-    const result = performanceTools.monthlyCsv(S.trades, month);
+    const result = performanceTools.monthlyCsv(performanceTools.filterStrategy(S.trades, performanceState.strategy), month);
     if (!result.count) return;
     const url = URL.createObjectURL(new Blob([result.csv], { type: 'text/csv;charset=utf-8' }));
     const link = document.createElement('a');
     try {
-      link.href = url; link.download = 'AST-청산거래-' + month + '.csv'; link.hidden = true;
+      link.href = url; link.download = 'AST-청산거래-' + month + (performanceState.strategy === undefined ? '' : '-전략선택') + '.csv'; link.hidden = true;
       document.body.append(link); link.click();
-      notice.textContent = month + ' 청산 거래 ' + result.count + '건의 CSV 다운로드를 요청했습니다.';
+      notice.textContent = month + ' · ' + $('#perf-strategy').selectedOptions[0].textContent + ' 청산 거래 ' + result.count + '건의 CSV 다운로드를 요청했습니다.';
     } finally {
       link.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
     }
@@ -388,22 +388,34 @@ function renderPerformance() {
     state.textContent = performanceError ? '성과 화면을 불러오지 못했습니다. 새로고침해 주세요.' : '거래 기록을 불러오는 중입니다.';
     return;
   }
-  const month = performanceTools.summarizeMonth(S.trades, performanceState.month);
+  const select = $('#perf-strategy');
+  const choices = performanceTools.strategyChoices(S.trades);
+  if (performanceState.strategy !== undefined && !choices.some(s => s.id === performanceState.strategy)) {
+    choices.push({ id: performanceState.strategy, name: performanceState.strategy ?? '전략 정보 없음' });
+  }
+  select.replaceChildren(new Option('전체 전략', ''), ...choices.map(s => new Option(s.name + (s.id === null ? '' : ' (' + s.id + ')'), JSON.stringify(s.id))));
+  select.value = performanceState.strategy === undefined ? '' : JSON.stringify(performanceState.strategy);
+  const filtered = performanceTools.filterStrategy(S.trades, performanceState.strategy);
+  const month = performanceTools.summarizeMonth(filtered, performanceState.month);
   const { summary } = month;
   performanceState.count = summary.count;
   updatePerformanceExport();
   $('#perf-month').textContent = `${month.year}년 ${month.number}월`;
+  $('#perf-month-input').disabled = false;
+  $('#perf-month-input').value = month.month;
+  $('#perf-month-input').removeAttribute('aria-invalid');
+  $('#perf-month-error').hidden = true;
   $('#perf-prev').disabled = month.month === '1970-01';
   $('#perf-next').disabled = month.month === '9999-12';
-  state.textContent = (summary.count ? `이번 달 청산 거래 ${summary.count}건` : '이번 달 청산된 거래가 없습니다.') + (month.invalid ? ` · 날짜나 손익을 확인할 수 없는 기록 ${month.invalid}건은 집계에서 제외했습니다.` : '');
+  state.textContent = select.selectedOptions[0].textContent + ' · ' + (summary.count ? `이번 달 청산 거래 ${summary.count}건` : '이번 달 청산된 거래가 없습니다.') + (month.invalid ? ` · 날짜나 손익을 확인할 수 없는 기록 ${month.invalid}건은 집계에서 제외했습니다.` : '');
   $('#perf-summary').innerHTML = [
     ['청산 순손익', signedWon(summary.pnl), cls(summary.pnl)],
     ['청산 거래', summary.count + '건', ''],
     ['성공', summary.wins + '건', 'pos'],
     ['실패 · 0원 포함', summary.losses + '건', 'neg'],
   ].map(([label, value, color]) => `<div class="perf-stat"><span class="muted small">${label}</span><strong class="mono ${color}">${value}</strong></div>`).join('');
-  const groups = performanceTools.summarizeStrategies(S.trades, performanceState.month);
-  $('#perf-strategies tbody').innerHTML = groups.length ? groups.map(g => `<tr><td>${esc(g.name)}${g.id == null ? '' : '<br><span class="muted small">' + esc(g.id) + '</span>'}</td><td class="n">${g.count}건</td><td class="n">${g.wins}건</td><td class="n">${g.losses}건</td><td class="n mono ${cls(g.pnl)}">${signedWon(g.pnl)}</td></tr>`).join('') : '<tr><td colspan="5" class="empty">이번 달 청산된 거래가 없습니다.</td></tr>';
+  const groups = performanceTools.summarizeStrategies(filtered, performanceState.month);
+  $('#perf-strategies tbody').innerHTML = groups.length ? groups.map(g => `<tr><td>${esc(g.name)}${g.id == null ? '' : '<br><span class="muted small">' + esc(g.id) + '</span>'}</td><td class="n">${g.count}건</td><td class="n">${g.wins}건</td><td class="n">${g.losses}건</td><td class="n mono ${cls(g.pnl)}">${signedWon(g.pnl)}</td><td class="n mono">${g.winRate.toFixed(1)}%</td><td class="n mono ${cls(g.averagePnl)}">${signedWon(g.averagePnl)}</td><td class="n mono">${g.profitFactor === null ? (g.grossProfit > 0 ? '손실 없음' : '—') : g.profitFactor.toFixed(2)}</td></tr>`).join('') : '<tr><td colspan="8" class="empty">이번 달 청산된 거래가 없습니다.</td></tr>';
   const focused = document.activeElement?.dataset.day;
   const compact = value => {
     const n = Math.round(Math.abs(value));
@@ -421,6 +433,24 @@ function renderPerformance() {
   $('#perf-day-summary').textContent = `${selected.count}건 · 순손익 ${signedWon(selected.pnl)}`;
   $('#perf-trades tbody').innerHTML = selected.count ? tradeRows(selected.trades) : '<tr><td colspan="10" class="empty">선택한 날짜에 청산된 거래가 없습니다.</td></tr>';
 }
+$('#perf-strategy').onchange = e => {
+  performanceState.strategy = e.target.value === '' ? undefined : JSON.parse(e.target.value);
+  $('#perf-export-status').hidden = true;
+  renderPerformance();
+};
+$('#perf-month-input').onchange = e => {
+  if (!performanceTools) return;
+  try {
+    performanceTools.monthInfo(e.target.value);
+    performanceState.month = e.target.value;
+    performanceState.day = e.target.value + '-01';
+    renderPerformance();
+  } catch {
+    e.target.setAttribute('aria-invalid', 'true');
+    $('#perf-month-error').textContent = '1970년 1월부터 9999년 12월 사이의 월을 선택해 주세요.';
+    $('#perf-month-error').hidden = false;
+  }
+};
 function changePerformanceMonth(delta) {
   if (!performanceTools) return;
   performanceState.month = performanceTools.shiftMonth(performanceState.month, delta);
