@@ -59,6 +59,8 @@ ssh <계정>@<서버IP> hostname   # 접속 확인용 한 줄 실행
 
 ## 변경 기록
 
+2026-10-27 Claude (T-033): 651f76d CI 자동 배포 후 /api/settings·/api/verify 응답 확인. paper/무포지션/운영 점검 정상(11:17 KST). POST /api/verify 24시간 세션 202610271118 시작. 설정 변경 없음.
+
 2026-10-27 Claude (T-027, 사용자 지시): 서버에 .env가 없어 코드 기본값(수수료0.25%·1회100만)으로 운영 중이었다. C:ast.env를 새로 만들어 FEE_RATE=0.0004, MAX_POSITION_KRW=3000000 두 줄만 넣었다(키·MODE 없음, 실행기가 paper 강제, 배포는 .env 미교체). 첫 작성은 원격 따옴표 처리로 내용이 깨져 scp 파일로 덮어썼다. 10:45 KST paper/무포지션/잔고1,000만 확인 후 AST-Paper-Trader Disable→Stop→Enable→Start. 첫 재기동 스크립트가 프로세스 확인 패턴 오류로 Stop 직후 멈춰 약2분 정지 후 수정본으로 재개. 새 Node PID 2800, /api/status config fee0.0004·maxPositionKrw3000000·paper 확인, 10:48 KST 운영 점검 정상. 관측 작업은 건드리지 않음.
 
 2026-10-26 후속: 연월 편집 보존 수정 main00dc7a3, Actions40259651484 test/deploy 성공 및 서버 SHA 일치. 실제 localhost8788 모바일 브라우저 확인 성공. UTC1792982124535 paper/무포지션/오류·경고0, 새 관측 running/2회. 12:00:03 KST 이후 새 봉 결과 확인이 남았다. 이후 로컬 성과 갱신 상태 표시 개선은 아직 배포하지 않았다.

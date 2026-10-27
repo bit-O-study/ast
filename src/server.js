@@ -20,7 +20,7 @@ async function readJson(req) {
 }
 
 // settings·verifier는 모의투자 전용 선택 기능. 없으면 해당 API는 404
-export function createServer({ cfg, trader, client, store, settings = null, verifier = null }) {
+export function createServer({ cfg, trader, client, store, settings = null, verifier = null, notifier = null }) {
   const btCache = new Map();
   return http.createServer(async (req, res) => {
     const url = new URL(req.url, 'http://localhost');
@@ -70,6 +70,15 @@ export function createServer({ cfg, trader, client, store, settings = null, veri
           return send(res, 400, { error: `알 수 없는 동작: ${action}` });
         }
         return send(res, 404, { error: '없는 주소입니다' });
+      }
+
+      if (url.pathname === '/api/notify') {
+        if (req.method === 'GET') return send(res, 200, { kakao: { configured: cfg.notifyKakao === 'on', enabled: !!notifier?.enabled } });
+        if (req.method === 'POST') {
+          if (!notifier) return send(res, 409, { error: '카카오톡 알림이 꺼져 있습니다 (NOTIFY_KAKAO=on 필요)' });
+          await notifier.test('대시보드에서 보낸 테스트 알림입니다');
+          return send(res, 200, { ok: true });
+        }
       }
 
       if (req.method === 'POST' && url.pathname === '/api/control') {

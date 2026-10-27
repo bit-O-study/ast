@@ -104,6 +104,9 @@ const n = createTelegramNotifier({ token, chatId, types: ['buy','sell','close','
 store.onEvent((e) => n.notify(e)); // 연결은 T-008
 ```
 
+- 카카오톡 (T-035): `createKakaoNotifier({ tokenFile, types, fetchImpl, onError })`도 같은 인터페이스(`notify`, `flush`, `close`, `enabled`)에 `test()`를 더한 것입니다. `NOTIFY_KAKAO=on`일 때 `src/index.js`가 `store.onEvent`에 연결합니다. 키·토큰은 토큰 파일에만 두고, `cfg`/`.env`에는 넣지 않습니다. 기본 종류는 buy·sell·close·error·kill·verify입니다.
+- `GET /api/notify` → `{ kakao: { configured, enabled } }`, `POST /api/notify` → 테스트 1건 전송 (꺼져 있으면 409)
+
 ## C7. 운영 감시 (T-004)
 
 ```js

@@ -76,10 +76,18 @@ export function createVerifyView({ $, api, kst, won, esc }) {
     }).join('') : '<li class="muted small">변경 이력이 없습니다.</li>';
   }
 
+  function renderNotify() {
+    const k = data.notify?.kakao;
+    if (!k) return;
+    $('#notify-test').disabled = !k.enabled;
+    $('#notify-state').textContent = k.enabled ? '켜짐 · 매수·매도·청산·오류·킬 스위치·실시간 검증 결과를 "나와의 채팅"으로 보냅니다.'
+      : k.configured ? '설정은 켜져 있지만 로그인 토큰이 없거나 만료됐습니다. 서버 로그를 확인하세요.' : '꺼짐 · 서버 .env에 NOTIFY_KAKAO=on과 로그인 토큰이 필요합니다.';
+  }
+
   async function load() {
-    const [verify, settings] = await Promise.all([api('/api/verify'), api('/api/settings')]);
-    data.verify = verify; data.settings = settings;
-    renderVerify(); renderSettings();
+    const [verify, settings, notify] = await Promise.all([api('/api/verify'), api('/api/settings'), api('/api/notify')]);
+    data.verify = verify; data.settings = settings; data.notify = notify;
+    renderVerify(); renderSettings(); renderNotify();
   }
 
   $('#verify-start').onclick = () => act('#verify-status', async () => {
@@ -114,6 +122,10 @@ export function createVerifyView({ $, api, kst, won, esc }) {
       notice('#settings-status', r.pending ? '포지션 보유 중이라 청산 후 적용됩니다.' : r.unchanged ? '현재 값과 같아 바뀐 것이 없습니다.' : '설정을 바로 적용했습니다.');
     });
   };
+  $('#notify-test').onclick = () => act('#notify-status', async () => {
+    await post('/api/notify', {});
+    notice('#notify-status', '테스트 알림을 보냈습니다. 카카오톡 "나와의 채팅"을 확인하세요.');
+  });
   $('#settings-reset').onclick = () => act('#settings-status', async () => {
     const r = await post('/api/settings/reset', {});
     data.settings = r.settings; renderSettings();

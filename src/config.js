@@ -49,6 +49,9 @@ export function buildConfig(env = process.env) {
     dailyLossLimit: num(env, 'DAILY_LOSS_LIMIT', 0.03),
     killSwitchLoss: num(env, 'KILL_SWITCH_LOSS', 0.15),
     pollSec: num(env, 'PRICE_POLL_SEC', 5),
+    // 카카오톡 알림 (T-035). 키·토큰은 토큰 파일에만 둔다
+    notifyKakao: (env.NOTIFY_KAKAO || 'off').toLowerCase(),
+    kakaoTokenFile: env.KAKAO_TOKEN_FILE || 'data/kakao-token.json',
     host: env.HOST || '127.0.0.1',
     port: num(env, 'PORT', 8787),
   };
@@ -60,6 +63,7 @@ export function buildConfig(env = process.env) {
   if (cfg.scaleIn && cfg.mode !== 'paper') throw new Error('분할매수는 현재 MODE=paper에서 검증 중입니다');
   if (cfg.scaleIn && cfg.strategy !== 'structure') throw new Error('분할매수는 STRATEGY=structure에서 사용합니다');
   if (cfg.scaleIn && (!(cfg.fee >= 0 && cfg.fee < 1) || !(cfg.slip >= 0 && cfg.slip < 1) || !(cfg.risk > 0 && cfg.risk <= 1) || !(cfg.maxPositionKrw > 0) || !(cfg.minOrderKrw > 0) || !(cfg.minRR > 0) || !(cfg.t1SellRatio > 0 && cfg.t1SellRatio < 1))) throw new Error('분할매수 비용·위험·주문·분할매도 설정 범위를 확인하세요');
+  if (!['on', 'off'].includes(cfg.notifyKakao)) throw new Error(`NOTIFY_KAKAO는 on 또는 off 여야 합니다 (현재 ${cfg.notifyKakao})`);
   if (![1, 3, 5, 10, 15, 30, 60, 240].includes(cfg.unit)) throw new Error(`CANDLE_UNIT ${cfg.unit} 은 빗썸이 지원하지 않습니다`);
   if (cfg.t2R <= cfg.t1R) throw new Error('T2_R은 T1_R보다 커야 합니다');
   if (!['btc', 'off'].includes(cfg.regimeFilter)) throw new Error(`REGIME_FILTER는 btc 또는 off 여야 합니다 (현재 ${cfg.regimeFilter})`);

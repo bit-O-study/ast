@@ -7,6 +7,7 @@ import { Trader } from './trader.js';
 import { createServer } from './server.js';
 import { Settings } from './settings.js';
 import { LiveVerifier } from './verify/live.js';
+import { createKakaoNotifier } from './notify/kakao.js';
 
 loadEnv();
 const cfg = buildConfig();
@@ -21,10 +22,16 @@ if (cfg.mode === 'paper') {
   trader.verifier = new LiveVerifier({ cfg, store, trader });
 }
 
+// 카카오톡 알림: NOTIFY_KAKAO=on일 때만 외부로 보낸다. 전송 실패는 로그만 남기고 매매 루프에 영향을 주지 않는다
+const kakao = cfg.notifyKakao === 'on'
+  ? createKakaoNotifier({ tokenFile: cfg.kakaoTokenFile, onError: (e) => console.log(`[알림] ${e.message}`) })
+  : null;
+if (kakao) store.onEvent((e) => kakao.notify(e));
+
 if (cfg.mode === 'live') console.log('⚠ 실거래 모드: 실제 주문이 나갑니다. 1회 최대 매수 금액', cfg.maxPositionKrw.toLocaleString('ko-KR'), '원');
 
 await trader.start();
-createServer({ cfg, trader, client, store, settings: trader.settings, verifier: trader.verifier }).listen(cfg.port, cfg.host, () => {
+createServer({ cfg, trader, client, store, settings: trader.settings, verifier: trader.verifier, notifier: kakao }).listen(cfg.port, cfg.host, () => {
   console.log(`대시보드: http://${cfg.host}:${cfg.port}`);
 });
 

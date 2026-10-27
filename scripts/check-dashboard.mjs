@@ -29,7 +29,7 @@ try {
         .map(([key, env, label, value]) => ({ key, env, label, value, base: value, overridden: false, pending: null }));
       const settingsView = { enabled: true, items: settingsItems, pending: null, history: [] };
       let verifyView = { enabled: true, session: null };
-      const settingsPosts = [];
+      const settingsPosts = [], notifyPosts = [];
       page.on('pageerror', e => errors.push(e.message));
       const status = { mode: 'paper', broker: '모의투자', market: 'KRW-BTC', unit: 240, price: 100800000, nextCandleAt: now + 14400000, halted: false, killed: false, config: { entryScore: 50, exitScore: 40, t1SellRatio: .5 }, summary: stats, balance: { krw: 10000000, coin: 0 }, position: null, signal: null };
       await page.route('**/*', async route => {
@@ -59,7 +59,9 @@ try {
             const prev = verifyView.session;
             verifyView = { enabled: true, session: { id: '1', state: action === 'start' ? 'running' : 'stopped', startedAt: now, endsAt: now + (hours ?? prev?.hours ?? 24) * 3600e3, hours: hours ?? prev?.hours ?? 24, market: 'KRW-BTC', progress: .25, candles: 1, fills: [{ at: now, type: 'buy', price: 100000000, amount: 3000000, fee: 1200, feeRate: .0004, maxPositionKrw: 3000000, ok: true }], warnings: [], failure: null, checks } };
             body = verifyView;
-          } else if (url.pathname === '/api/verify/report') body = { id: '1', state: 'running', markdown: '# 실시간 모의투자 검증 1 · 진행 중' };
+          } else if (url.pathname === '/api/notify' && route.request().method() === 'GET') body = { kakao: { configured: true, enabled: true } };
+          else if (url.pathname === '/api/notify') { notifyPosts.push(1); body = { ok: true }; }
+          else if (url.pathname === '/api/verify/report') body = { id: '1', state: 'running', markdown: '# 실시간 모의투자 검증 1 · 진행 중' };
           else if (url.pathname === '/api/control') {
             const { action } = route.request().postDataJSON();
             actions.push(action);
@@ -519,6 +521,10 @@ try {
         await page.waitForFunction(() => document.querySelector('#settings-status').textContent.includes('바꿀 값을 입력'));
         assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
         await page.screenshot({ path: resolve(out, 'verify-' + width + '-' + colorScheme + '.png'), fullPage: true });
+        assert.match(await page.locator('#notify-state').textContent(), /켜짐/);
+        await page.locator('#notify-test').click();
+        await page.waitForFunction(() => document.querySelector('#notify-status').textContent.includes('보냈습니다'));
+        assert.equal(notifyPosts.length, 1);
         await page.locator('#verify-stop').click();
         await page.waitForFunction(() => document.querySelector('#verify-badge').textContent === '중단');
         await page.locator('#tab-live').click();

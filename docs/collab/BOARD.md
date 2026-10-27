@@ -8,17 +8,18 @@
 
 | 작업 | 담당 | 시작 | 메모 |
 |---|---|---|---|
+| T-034 | Codex | 2026-10-27 | score 손실·비용 분해 |
 | T-033 | Claude | 2026-10-27 | 모의투자 실시간 검증·설정 즉시 변경 |
-| T-032 | Codex | 2026-10-27 | 변동성 상태별 진입 비교 |
-| T-032 | Codex | 2026-10-27 | 변동성 상태별 진입 비교 |
+| T-035 | Claude | 2026-10-27 | 카카오톡 알림 (나에게 보내기) |
 
 ## 작업 목록
 
 | ID | 작업 | 담당 | 상태 | 선행 | 명세 |
 |---|---|---|---|---|---|
-| T-033 | 모의투자 실시간 검증·설정 즉시 변경 | Claude | 개발 중 · Claude (구현·V1/V2/브라우저 완료, 배포 후 24시간 V3) | 사용자 요청 | [T-033](../tasks/T-033-live-verify-settings.md) |
-| T-032 | 변동성 상태별 점수 진입 | Codex | 개발 중 · Codex | 사용자 지속 연구 | [T-032](../tasks/T-032-volatility-state.md) |
-| T-032 | 변동성 상태별 점수 진입 | Codex | 개발 중 · Codex | 사용자 지속 연구 | [T-032](../tasks/T-032-volatility-state.md) |
+| T-034 | 손실 원인·비용 분해 | Codex | 개발 중 · Codex | 사용자 지속 연구 | [T-034](../tasks/T-034-loss-attribution.md) |
+| T-035 | 카카오톡 알림 (나에게 보내기)·매매 루프 연결 | Claude | 개발 중 · Claude (구현 완료, 사용자 카카오 로그인 대기) | 사용자 요청 | [T-035](../tasks/T-035-kakao-notify.md) |
+| T-033 | 모의투자 실시간 검증·설정 즉시 변경 | Claude | 개발 중 · Claude (배포 완료, 24시간 V3 진행 중 ~10-28 11:18 KST) | 사용자 요청 | [T-033](../tasks/T-033-live-verify-settings.md) |
+| T-032 | 변동성 상태별 점수 진입 | Codex | 리뷰 대기 (탐색 통과·2023 추가 검증 탈락) | 사용자 지속 연구 | [T-032](../tasks/T-032-volatility-state.md) |
 | T-031 | 개발 PC Tailscale 복구 | Codex | 리뷰 대기 (Running·SSH 확인) | 사용자 복구 요청 | [T-031](../tasks/T-031-tailscale-repair.md) |
 | T-030 | 상승국면 눌림 회복 연구 | Codex | 리뷰 대기 (90개·전후보 탈락) | 사용자 지속 연구 | [T-030](../tasks/T-030-pullback-recovery.md) |
 | T-029 | 국면 진입·공통 위험관리 | Codex | 리뷰 대기 (72개·전후보 탈락) | 사용자 지속 연구 | [T-029](../tasks/T-029-regime-risk.md) |
