@@ -150,6 +150,12 @@ s.close();
 - API: `?market=`로 종목을 고릅니다(없으면 첫 종목, 모르는 종목이면 400). `/api/status`에 `markets`, `portfolio` 선택 필드가 붙습니다. `/api/trades`·`/api/events`는 market이 없으면 전 종목을 합칩니다.
 - 배포: `portfolio.markets` 중 하나라도 포지션·코인·오류가 있으면 배포를 중단합니다.
 
+## C12. 1회 매수 금액 상한 (T-040)
+
+- `positionCap(cfg, streak)`(src/sizing.js)를 백테스트와 Trader가 같이 씁니다. `streak`은 `buildRegime().streak(T)`이며, T 시각까지 마감된 BTC 봉이 국면 평균 위에 연속으로 있었던 봉 수입니다.
+- `BOOST_POSITION_KRW`(기본 0=끔, paper 전용)가 있고 streak ≥ REGIME_DAYS 봉이면 그 금액을, 아니면 `MAX_POSITION_KRW`를 상한으로 씁니다.
+- 매수 이벤트의 `maxPositionKrw`는 실제로 적용된 상한이고, 확대했으면 `boost: true`가 붙습니다.
+
 ## C9. 의존성 예외
 
 - `ws` 패키지: Node 20에는 기본 WebSocket이 없어 T-005에서 추가를 허용합니다. `globalThis.WebSocket`이 있으면 그것을 먼저 씁니다.

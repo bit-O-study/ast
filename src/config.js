@@ -47,6 +47,8 @@ export function buildConfig(env = process.env) {
     lossCooldownBars: num(env, 'LOSS_COOLDOWN_BARS', 0),
     risk: num(env, 'RISK_PER_TRADE', 0.02),
     maxPositionKrw: num(env, 'MAX_POSITION_KRW', 1_000_000),
+    // 상승장 투입 확대 (T-040, 0=끔)
+    boostPositionKrw: num(env, 'BOOST_POSITION_KRW', 0),
     minOrderKrw: num(env, 'MIN_ORDER_KRW', 5000),
     dailyLossLimit: num(env, 'DAILY_LOSS_LIMIT', 0.03),
     killSwitchLoss: num(env, 'KILL_SWITCH_LOSS', 0.15),
@@ -69,6 +71,8 @@ export function buildConfig(env = process.env) {
   if (cfg.markets.some((m) => !/^KRW-[A-Z0-9]+$/.test(m))) throw new Error(`MARKETS 형식이 올바르지 않습니다 (예: KRW-BTC,KRW-ETH)`);
   if (cfg.markets.length) cfg.market = cfg.markets[0];
   if (cfg.markets.length > 1 && cfg.mode !== 'paper') throw new Error('여러 종목 동시 운용은 현재 MODE=paper에서 검증 중입니다');
+  if (cfg.boostPositionKrw && !(cfg.boostPositionKrw >= cfg.maxPositionKrw && cfg.boostPositionKrw <= cfg.paperKrw)) throw new Error('BOOST_POSITION_KRW는 0이거나 MAX_POSITION_KRW 이상·모의자금 이하여야 합니다');
+  if (cfg.boostPositionKrw && cfg.mode !== 'paper') throw new Error('상승장 투입 확대는 현재 MODE=paper에서 검증 중입니다');
   if (!['on', 'off'].includes(cfg.notifyKakao)) throw new Error(`NOTIFY_KAKAO는 on 또는 off 여야 합니다 (현재 ${cfg.notifyKakao})`);
   if (![1, 3, 5, 10, 15, 30, 60, 240].includes(cfg.unit)) throw new Error(`CANDLE_UNIT ${cfg.unit} 은 빗썸이 지원하지 않습니다`);
   if (cfg.t2R <= cfg.t1R) throw new Error('T2_R은 T1_R보다 커야 합니다');

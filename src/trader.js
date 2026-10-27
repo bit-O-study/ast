@@ -5,6 +5,7 @@ import { openPosition, priceAction, applyExit, onCandleClose, toTrade, completed
 import { computeStats } from './backtest.js';
 import { firstAllocation, additionalAllocation, applyAdditional } from './scale.js';
 import { reentryAllowed } from './reentry.js';
+import { positionCap } from './sizing.js';
 
 const kstDay = (t) => new Date(t + 9 * 3600e3).toISOString().slice(0, 10);
 
@@ -166,7 +167,9 @@ export class Trader {
     const eq = this.portfolio ? this.portfolio.equity() : this.equity(price);
     const allocation = this.cfg.scaleIn ? firstAllocation({ cash: this.bal.krw, equity: eq, price: price * (1 + this.cfg.slip), plan, atr: this.I.atr[i], signalAt: d[i].t }, this.cfg) : null;
     if (this.cfg.scaleIn && !allocation) { this.emit('skip', { msg: '분할 예산·비용 반영 손익비 부족' }); return; }
-    const krw = allocation?.cost ?? Math.min(((eq * this.cfg.risk) / plan.R) * price * (1 + this.cfg.fee), this.bal.krw * 0.999, this.cfg.maxPositionKrw);
+    // 1회 상한: 상승장이 길게 이어지면 BOOST_POSITION_KRW (백테스트와 같은 positionCap)
+    const cap = positionCap(this.cfg, this.regime.streak(d[i].t + this.unitMs));
+    const krw = allocation?.cost ?? Math.min(((eq * this.cfg.risk) / plan.R) * price * (1 + this.cfg.fee), this.bal.krw * 0.999, cap);
     if (krw < this.cfg.minOrderKrw) { this.emit('skip', { msg: `주문 가능 금액 부족 (${Math.round(krw)}원)` }); return; }
 
     const fill = await this.broker.buyMarket(krw, price);
@@ -180,7 +183,7 @@ export class Trader {
     this.store.save();
     const w = (x) => Math.round(x).toLocaleString('ko-KR');
     this.emit('buy', { msg: `${pos.scale ? '1차 ' : ''}매수 ${w(fill.price)}원 × ${fill.qty.toFixed(8)} · 손절가 ${w(pos.stop)} · 1차 목표 ${w(pos.t1)} · 2차 목표 ${w(pos.t2)}`,
-      positionId: pos.id, price: fill.price, qty: fill.qty, stop: pos.stop, t1: pos.t1, t2: pos.t2, score: this.signal.score, ...(pos.scale ? { stage: 1 } : {}), ...this.fillInfo(fill) });
+      positionId: pos.id, price: fill.price, qty: fill.qty, stop: pos.stop, t1: pos.t1, t2: pos.t2, score: this.signal.score, ...(pos.scale ? { stage: 1 } : {}), ...this.fillInfo(fill, cap), ...(cap > this.cfg.maxPositionKrw ? { boost: true } : {}) });
   }
 
   async addPosition() {
@@ -229,10 +232,10 @@ export class Trader {
   }
 
   // 체결 이벤트에 남기는 대조 정보 (실시간 검증용)
-  fillInfo(fill) {
+  fillInfo(fill, cap = this.cfg.maxPositionKrw) {
     return {
       ...(Number.isFinite(fill.cost) ? { cost: fill.cost } : {}), ...(Number.isFinite(fill.proceeds) ? { proceeds: fill.proceeds } : {}),
-      fee: fill.fee ?? null, feeRate: this.cfg.fee, maxPositionKrw: this.cfg.maxPositionKrw,
+      fee: fill.fee ?? null, feeRate: this.cfg.fee, maxPositionKrw: cap,
     };
   }
 

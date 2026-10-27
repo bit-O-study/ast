@@ -4,6 +4,7 @@ import { buildRegime } from './regime.js';
 import { openPosition, priceAction, applyExit, onCandleClose, toTrade, completedHoldingBars } from './position.js';
 import { firstAllocation, additionalAllocation, applyAdditional, buyQuantity } from './scale.js';
 import { reentryAllowed } from './reentry.js';
+import { positionCap } from './sizing.js';
 
 // 성과 집계: 총손익, 승률, 손익비, 최대 낙폭
 export function computeStats(trades, equity, capital) {
@@ -80,7 +81,7 @@ export function backtest(d, cfg, { capital = cfg.paperKrw, btc = null, signalFro
       const plan = planEntry(d, I, i - 1, price, cfg);
       if (!plan.ok) skipped.push({ at: b.t, idx: i, reason: plan.reason, score: pending.score });
       else {
-        const budget = Math.min(cash, cfg.maxPositionKrw);
+        const budget = Math.min(cash, positionCap(cfg, regime.streak(d[i - 1].t + unitMs)));
         const allocation = cfg.scaleIn ? firstAllocation({ cash, equity: cash, price, plan, atr: I.atr[i - 1], signalAt: d[i - 1].t }, cfg) : null;
         const qty = cfg.scaleIn ? allocation ? buyQuantity(allocation.cost, price, cfg) : 0 : Math.min((cash * cfg.risk) / plan.R, budget / (price * (1 + cfg.fee)));
         const cost = cfg.scaleIn ? allocation?.cost ?? 0 : qty * price * (1 + cfg.fee);
