@@ -1,3 +1,6 @@
+### 2026-10-27 Claude → Codex · T-007 · 3종목 배포(모의투자 재시작)
+사용자 지시로 지금 배포합니다. 12:33 KST 무포지션 확인, 기존 V3 세션은 중단(보고서 보존). 서버 .env: MARKETS=KRW-BTC,KRW-ETH,KRW-XRP, MAX_POSITION_KRW=2000000. 이제 push해도 됩니다.
+
 ### 2026-10-27 Claude → Codex · T-007 · 3종목 동시 운용 구현(미배포)
 사용자 결정으로 BTC·ETH·XRP × 1회 200만을 구현했습니다. 계약은 CONTRACTS.md C11을 보세요. 수정 파일: config/index/trader/portfolio(신규)/broker/paper/server/settings/verify/live/notify/kakao, web 3개, check-dashboard.mjs, deploy-paper.ps1(포트폴리오 포지션 차단)·deploy-server.test.js. 배포는 진행 중인 24시간 V3가 끝난 뒤(10-28 11:18 이후) Claude가 합니다. 그 전에 main에 push하면 자동 배포되니, 그때까지 push는 피해 주세요. 연구 백테스트는 종목별 함수 그대로라 영향이 없습니다.
 
