@@ -48,7 +48,7 @@ try {
           } else throw new Error('예상하지 않은 API: ' + url.pathname);
           return route.fulfill({ json: body });
         }
-        const file = { '/': 'index.html', '/app.js': 'app.js', '/performance.js': 'performance.js', '/style.css': 'style.css' }[url.pathname];
+        const file = { '/': 'index.html', '/app.js': 'app.js', '/decision.js': 'decision.js', '/performance.js': 'performance.js', '/style.css': 'style.css' }[url.pathname];
         if (!file) return route.fulfill({ status: 404, body: '' });
         return route.fulfill({ body: await readFile(new URL('../web/' + file, import.meta.url)), contentType: file.endsWith('.css') ? 'text/css' : file.endsWith('.js') ? 'text/javascript' : 'text/html; charset=utf-8' });
       });
@@ -441,6 +441,35 @@ try {
         fail.clear();
         await page.evaluate(() => loadLists());
         assert.equal(await page.locator('#perf-export').isDisabled(), false);
+      });
+      await check('구조 판단과 분할매수 표시', async () => {
+        status.strategy = { id: 'structure', name: '구조·수급 확인' };
+        status.signal = { at: now, score: 60, enter: false, trend: true, adx: 25, rsi: 55, parts: [], note: '관망: 가격 구조 미충족',
+          analysis: { wave: { stage: '눌림 확인', retracement: .5, support: 99000000, resistance: 102000000 }, accumulation: '매수 압력 우세 후보', relativeVolume: 1.2, cmf: .1, avwap: 100000000, checks: [{ ok: false, label: '가격 구조', reason: '재돌파 대기' }] } };
+        status.position = { entryPrice: 100000000, qty: .004, qtyInit: .004, cost: 400000, unrealized: 1000, history: [], stop: 98000000, initialStop: 98000000, stopType: 'initial', t1: 104000000, t2: 108000000, t1Done: false, exits: [],
+          scale: { stage: 1, budget: 1000000 }, entries: [{ stage: 1, price: 100000000, cost: 400000 }] };
+        await page.locator('#tab-live').click();
+        await page.evaluate(() => loadStatus());
+        await page.waitForFunction(() => document.querySelector('#signal').textContent.includes('눌림 확인'));
+        assert.match(await page.locator('#signal').textContent(), /성공 확률이 아닙니다/);
+        assert.match(await page.locator('#position').textContent(), /1차 매수 완료/);
+        assert.match(await page.locator('#position').textContent(), /평균 매수가/);
+        assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+        await page.screenshot({ path: resolve(out, `structure-${width}-${colorScheme}.png`), fullPage: true });
+      });
+      await check('6분류18항목 상세 지표와 모바일 펼침', async () => {
+        const { indicatorDetail } = await import('../src/analysis/detail.js');
+        const { indicators } = await import('../src/indicators.js');
+        const d = Array.from({ length: 100 }, (_, i) => ({ t: now - (100-i)*14400000, o: 100+i, c: 101+i, h: 102+i, l: 99+i, v: 100+i }));
+        status.strategy = { id: 'score', name: '지표 점수' };
+        status.signal.analysis = { kind: 'indicators', details: indicatorDetail(d, indicators(d), 99) };
+        await page.evaluate(() => loadStatus());
+        await page.waitForFunction(() => document.querySelector('#signal').textContent.includes('18항목'));
+        assert.equal(await page.locator('#signal details').count(), 6);
+        for (const summary of await page.locator('#signal details summary').all()) await summary.click();
+        assert.match(await page.locator('#signal').textContent(), /현재 봉을 제외/);
+        assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+        await page.screenshot({ path: resolve(out, `detail-${width}-${colorScheme}.png`), fullPage: true });
       });
       await check('브라우저 오류 없음', async () => assert.deepEqual(errors, []));
       await page.close();

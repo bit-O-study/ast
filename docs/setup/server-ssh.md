@@ -59,6 +59,10 @@ ssh <계정>@<서버IP> hostname   # 접속 확인용 한 줄 실행
 
 ## 변경 기록
 
+2026-10-27 Claude (T-027, 사용자 지시): 서버에 .env가 없어 코드 기본값(수수료0.25%·1회100만)으로 운영 중이었다. C:ast.env를 새로 만들어 FEE_RATE=0.0004, MAX_POSITION_KRW=3000000 두 줄만 넣었다(키·MODE 없음, 실행기가 paper 강제, 배포는 .env 미교체). 첫 작성은 원격 따옴표 처리로 내용이 깨져 scp 파일로 덮어썼다. 10:45 KST paper/무포지션/잔고1,000만 확인 후 AST-Paper-Trader Disable→Stop→Enable→Start. 첫 재기동 스크립트가 프로세스 확인 패턴 오류로 Stop 직후 멈춰 약2분 정지 후 수정본으로 재개. 새 Node PID 2800, /api/status config fee0.0004·maxPositionKrw3000000·paper 확인, 10:48 KST 운영 점검 정상. 관측 작업은 건드리지 않음.
+
+2026-10-26 후속: 연월 편집 보존 수정 main00dc7a3, Actions40259651484 test/deploy 성공 및 서버 SHA 일치. 실제 localhost8788 모바일 브라우저 확인 성공. UTC1792982124535 paper/무포지션/오류·경고0, 새 관측 running/2회. 12:00:03 KST 이후 새 봉 결과 확인이 남았다. 이후 로컬 성과 갱신 상태 표시 개선은 아직 배포하지 않았다.
+
 2026-10-26: Codex가 기존 main CI/CD 경로로 성과 UI 후속을 배포했다. Actions 40256242473 test/deploy success, 서버 release SHA 6632c122f39d7eba4089a43ea072f642d419eef4 일치. 배포 전후 paper/무포지션 확인. UTC 1792980503084 점검에서 오류·경고 0, 새 봉 관측 running/32회(12:00:03 KST 마감 목표). 부모가 만든 개발 PC SSH 터널 PID3276/localhost8788은 유지했다. 실거래/API 키/방화벽 변경 없음.
 
 | 날짜 | 누가 | 변경 |

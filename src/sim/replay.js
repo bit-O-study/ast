@@ -56,6 +56,7 @@ export async function replay(d, cfg, { btc = null, warm = 200 } = {}) {
 }
 
 const route = (t) => t.exits.map((e) => e.reason).join(' → ');
+const entryStages = (t) => (t.entries ?? []).map(e => `${e.stage}:${e.signalAt}`).join('|');
 
 // 같은 시세·설정으로 리플레이와 백테스트를 돌려 대조한다
 export async function verify(d, cfg, { btc = null, warm = 200 } = {}) {
@@ -66,17 +67,18 @@ export async function verify(d, cfg, { btc = null, warm = 200 } = {}) {
   const pairs = [], onlyReplay = [];
   for (const r of rp.trades) {
     const b = byEntry.get(r.entryIdx);
-    if (b) { pairs.push({ r, b, sameExit: r.exitIdx === b.exitIdx, sameRoute: route(r) === route(b) }); byEntry.delete(r.entryIdx); }
+    if (b) { pairs.push({ r, b, sameExit: r.exitIdx === b.exitIdx, sameRoute: route(r) === route(b), sameStages: entryStages(r) === entryStages(b) }); byEntry.delete(r.entryIdx); }
     else onlyReplay.push(r);
   }
   const onlyBacktest = [...byEntry.values()];
   const total = Math.max(rp.trades.length, btTrades.length);
   const entryMatch = total ? pairs.length / total : 1;
   const routeMatch = pairs.length ? pairs.filter((p) => p.sameRoute).length / pairs.length : 1;
+  const stageMatch = pairs.length ? pairs.filter(p => p.sameStages).length / pairs.length : 1;
   const pnl = (arr) => arr.reduce((a, t) => a + t.pnl, 0);
   return {
-    pass: entryMatch >= 0.9 && routeMatch >= 0.9 && rp.errors.length === 0,
-    entryMatch, routeMatch,
+    pass: entryMatch >= 0.9 && routeMatch >= 0.9 && stageMatch >= 0.9 && rp.errors.length === 0,
+    entryMatch, routeMatch, stageMatch,
     replay: { trades: rp.trades.length, pnl: pnl(rp.trades), final: rp.final, errors: rp.errors },
     backtest: { trades: btTrades.length, pnl: pnl(btTrades), final: bt.stats.final },
     pairs, onlyReplay, onlyBacktest, startIdx: warm,
@@ -104,9 +106,11 @@ export function verifyReport(v, d, cfg, { title = '리플레이 검증' } = {}) 
     '',
     `- 진입 일치: ${pct(v.entryMatch)} (짝지어진 거래 ${v.pairs.length}건)`,
     `- 청산 경로 일치: ${pct(v.routeMatch)}`,
+    `- 분할 매수 단계·신호봉 일치: ${pct(v.stageMatch)}`,
+    `- 분할 매수: ${cfg.scaleIn ? `사용 (1차 ${(cfg.firstBuyRatio * 100).toFixed(0)}%)` : '끔'}. 거래 0건은 실행 경로를 검증한 증거가 아닙니다. 수익성 검증과 구분합니다.`,
     '',
   ];
-  const diffs = v.pairs.filter((p) => !p.sameRoute || !p.sameExit);
+  const diffs = v.pairs.filter((p) => !p.sameRoute || !p.sameExit || !p.sameStages);
   if (diffs.length) {
     lines.push('## 청산이 다른 거래', '', '| 진입 | 리플레이 청산 | 백테스트 청산 | 손익 차이 |', '|---|---|---|---|');
     for (const { r, b } of diffs) lines.push(`| ${kst(d[r.entryIdx].t)} | ${kst(d[r.exitIdx].t)} ${route(r)} | ${kst(d[b.exitIdx].t)} ${route(b)} | ${won(r.pnl - b.pnl)}원 |`);

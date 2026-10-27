@@ -1,4 +1,7 @@
 // AST 자동매매 대시보드
+let decisionTools = null;
+const decisionHtml = analysis => decisionTools ? decisionTools.decisionHtml(analysis) : analysis ? '<p class="muted small">상세 판단 표시를 불러오는 중입니다.</p>' : '';
+const scaleHtml = pos => decisionTools ? decisionTools.scaleHtml(pos) : '';
 const $ = (s) => document.querySelector(s);
 const css = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 const fin = Number.isFinite;
@@ -15,6 +18,13 @@ const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&l
 const STOP_LABEL = { initial: '초기 손절가', breakeven: '본전 손절가', trail: '추적 손절가', breach: '이탈 경계 손절가', timeout: '보유기간 경계 손절가' };
 
 const S = { status: null, chart: null, trades: [], filter: 'all', bt: null, hover: {} };
+import('/decision.js').then(module => {
+  decisionTools = module;
+  if (S.status) { renderPosition(S.status); renderSignal(S.status.signal, S.status.config, S.status.strategy); }
+}).catch(() => {
+  decisionTools = { decisionHtml: a => a ? '<p class="warn-box">상세 판단 표시를 불러오지 못했습니다. 새로고침해 주세요.</p>' : '', scaleHtml: () => '' };
+  if (S.status) renderSignal(S.status.signal, S.status.config, S.status.strategy);
+});
 const api = async (p, opt = {}, timeoutMs = 10000) => {
   const abort = new AbortController();
   const timer = setTimeout(() => abort.abort(), timeoutMs);
@@ -63,7 +73,8 @@ function kpiHtml(s, extra) {
 function renderPosition(st) {
   const p = st.position, price = st.price;
   if (!p) {
-    $('#position').innerHTML = `<h3>보유 포지션</h3><p class="muted small">보유 중인 코인이 없습니다. 판단 점수가 +${st.config.entryScore} 이상이면 다음 봉 마감 때 매수하고, 그때 손절가와 목표가를 함께 정합니다.</p>`;
+    const rule = st.strategy?.id === 'defensive' ? '2봉 연속 점수·상승 추세·방향·과열 제한을 모두 확인합니다. 주문 직전 비용 포함 손익비와 추격 여부도 검사합니다.' : st.strategy?.id === 'structure' ? '추세·수급·가격 구조를 마감봉에서 함께 확인합니다. 분할매수 사용 시 계획 예산 일부로 1차 진입합니다.' : `판단 점수가 +${st.config.entryScore} 이상이면 다음 봉 마감 때 매수하고, 그때 손절가와 목표가를 함께 정합니다.`;
+    $('#position').innerHTML = `<h3>보유 포지션</h3><p class="muted small">보유 중인 코인이 없습니다. ${rule}</p>`;
     return;
   }
   const dist = (x) => signedPct(((x - price) / price) * 100, 2);
@@ -71,7 +82,8 @@ function renderPosition(st) {
   const hist = p.history.slice(-4).reverse().map((h) => `<div class="row"><span class="muted">${kst(h.at)} ${STOP_LABEL[h.type]}</span><span>${won(h.stop)}</span></div>`).join('');
   $('#position').innerHTML = `
     <h3>보유 포지션</h3>
-    <div class="row"><span>진입가</span><span>${won(p.entryPrice)}원</span></div>
+    <div class="row"><span>${p.scale ? '평균 매수가' : '진입가'}</span><span>${won(p.entryPrice)}원</span></div>
+    ${scaleHtml(p)}
     <div class="row"><span>수량</span><span>${p.qty.toFixed(8)}${p.qty < p.qtyInit ? ` / ${p.qtyInit.toFixed(8)}` : ''}</span></div>
     <div class="row"><span>평가손익</span><span class="${cls(p.unrealized)}">${signedWon(p.unrealized)} (${signedPct(pnlPct)})</span></div>
     ${p.warn ? `<div class="warn-box">이탈 신호 (${kst(p.warn.at)} · ${esc(p.warn.reason)}): 바로 팔지 않고 손절가까지 더 떨어지면 매도합니다.</div>` : ''}
@@ -95,6 +107,7 @@ function renderSignal(sig, cfg, strategy) {
     <h3>판단 <span class="muted small">${kst(sig.at)} 마감 봉 · ${esc(strategy?.name ?? '')} 전략</span></h3>
     <div><span class="verdict ${v[1]}">${v[0]}</span> <span class="mono ${cls(s)}" style="font-size:17px;margin-left:6px">${sgn(s)}${Math.abs(s).toFixed(0)}점</span></div>
     <div class="small muted">${esc(sig.note ?? '')}</div>
+    ${decisionHtml(sig.analysis)}
     <div class="small">${regimeLine}</div>
     <div class="small muted">${sig.trend ? '추세장' : '횡보장'} · ADX ${sig.adx.toFixed(0)} · RSI ${sig.rsi.toFixed(0)} · 이탈 기준 −${cfg.exitScore}</div>
     ${sig.parts.map((p) => `<div class="frow"><span>${p.label}</span><span class="bar"><i style="background:${p.s >= 0 ? 'var(--up)' : 'var(--down)'};${p.s >= 0 ? 'left' : 'right'}:50%;width:${Math.min(50, Math.abs(p.s) * 50)}%"></i></span><span class="p ${cls(p.pts)}">${sgn(p.pts)}${Math.abs(p.pts).toFixed(0)}</span></div>`).join('')}`;

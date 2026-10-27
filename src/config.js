@@ -26,6 +26,8 @@ export function buildConfig(env = process.env) {
     market: env.MARKET || 'KRW-BTC',
     unit: num(env, 'CANDLE_UNIT', 240),
     strategy: env.STRATEGY || 'score',
+    scaleIn: env.SCALE_IN === undefined ? env.STRATEGY === 'structure' : env.SCALE_IN === 'true',
+    firstBuyRatio: num(env, 'FIRST_BUY_RATIO', 0.4),
     regimeFilter: (env.REGIME_FILTER || 'btc').toLowerCase(),
     regimeDays: num(env, 'REGIME_DAYS', 20),
     fee: num(env, 'FEE_RATE', 0.0025),
@@ -40,6 +42,7 @@ export function buildConfig(env = process.env) {
     t1SellRatio: num(env, 'T1_SELL_RATIO', 0.5),
     minRR: num(env, 'MIN_RR', 1.5),
     maxHoldBars: num(env, 'MAX_HOLD_BARS', 40),
+    lossCooldownBars: num(env, 'LOSS_COOLDOWN_BARS', 0),
     risk: num(env, 'RISK_PER_TRADE', 0.02),
     maxPositionKrw: num(env, 'MAX_POSITION_KRW', 1_000_000),
     minOrderKrw: num(env, 'MIN_ORDER_KRW', 5000),
@@ -50,6 +53,13 @@ export function buildConfig(env = process.env) {
     port: num(env, 'PORT', 8787),
   };
   if (!['paper', 'live'].includes(cfg.mode)) throw new Error(`MODE는 paper 또는 live 여야 합니다 (현재 ${cfg.mode})`);
+  if (!Number.isInteger(cfg.lossCooldownBars) || cfg.lossCooldownBars < 0 || cfg.lossCooldownBars > 240) throw new Error('LOSS_COOLDOWN_BARS는 0~240 정수여야 합니다');
+  if (cfg.lossCooldownBars && cfg.mode !== 'paper') throw new Error('손실 후 재진입 대기는 현재 MODE=paper에서 검증 중입니다');
+  if (env.SCALE_IN !== undefined && !['true', 'false'].includes(env.SCALE_IN)) throw new Error('SCALE_IN은 true 또는 false여야 합니다');
+  if (!(cfg.firstBuyRatio > 0 && cfg.firstBuyRatio < 1)) throw new Error('FIRST_BUY_RATIO는 0과 1 사이여야 합니다');
+  if (cfg.scaleIn && cfg.mode !== 'paper') throw new Error('분할매수는 현재 MODE=paper에서 검증 중입니다');
+  if (cfg.scaleIn && cfg.strategy !== 'structure') throw new Error('분할매수는 STRATEGY=structure에서 사용합니다');
+  if (cfg.scaleIn && (!(cfg.fee >= 0 && cfg.fee < 1) || !(cfg.slip >= 0 && cfg.slip < 1) || !(cfg.risk > 0 && cfg.risk <= 1) || !(cfg.maxPositionKrw > 0) || !(cfg.minOrderKrw > 0) || !(cfg.minRR > 0) || !(cfg.t1SellRatio > 0 && cfg.t1SellRatio < 1))) throw new Error('분할매수 비용·위험·주문·분할매도 설정 범위를 확인하세요');
   if (![1, 3, 5, 10, 15, 30, 60, 240].includes(cfg.unit)) throw new Error(`CANDLE_UNIT ${cfg.unit} 은 빗썸이 지원하지 않습니다`);
   if (cfg.t2R <= cfg.t1R) throw new Error('T2_R은 T1_R보다 커야 합니다');
   if (!['btc', 'off'].includes(cfg.regimeFilter)) throw new Error(`REGIME_FILTER는 btc 또는 off 여야 합니다 (현재 ${cfg.regimeFilter})`);

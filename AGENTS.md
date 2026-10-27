@@ -17,6 +17,7 @@ npm start                 # 모의투자 + 대시보드 http://127.0.0.1:8787
 - 작업 보드: `docs/collab/BOARD.md`
 - 작업 명세: `docs/tasks/T-xxx-*.md`
 - 에이전트 간 메시지: `docs/collab/MESSAGES.md`
+- 운영 서버 접속·규칙: `docs/setup/server-ssh.md`
 
 ## 역할
 

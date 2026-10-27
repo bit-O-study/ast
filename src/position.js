@@ -24,14 +24,20 @@ const SELL_REASON = {
   timeout: '보유기간 초과 후 손절가 도달',
 };
 
+// 진입 직전 신호봉부터 센다. 첫 보유봉 마감은1봉이며 공백도 경과 시간에 포함한다.
+export function completedHoldingBars(entrySignalAt, signalAt, unitMinutes) {
+  return Math.round((signalAt - entrySignalAt) / (unitMinutes * 60000));
+}
+
 function strategySnapshot(strategy) {
   if (typeof strategy?.id !== 'string' || !strategy.id.trim()) return null;
   return { id: strategy.id, name: typeof strategy.name === 'string' && strategy.name.trim() ? strategy.name : strategy.id };
 }
 
-export function openPosition({ at, idx = null, price, qty, cost, plan, signal, strategy = null }) {
+export function openPosition({ at, idx = null, price, qty, cost, plan, signal, strategy = null, scale = null }) {
   return {
     strategy: strategySnapshot(strategy),
+    ...(scale ? { scale: { ...scale }, entries: [{ at, signalAt: scale.lastSignalAt, price, qty, cost, stage: 1 }], analysis: signal?.analysis ?? null } : {}),
     entryAt: at, entryIdx: idx, entryPrice: price,
     qty, qtyInit: qty, cost,
     stop: plan.stop, stopType: 'initial', initialStop: plan.stop,
@@ -72,7 +78,7 @@ export function applyExit(pos, { at, idx = null, price, qty, proceeds, reason, k
   if (kind === 't1') {
     pos.t1Done = true;
     // 수수료까지 감안한 본전 가격
-    const be = (pos.entryPrice * (1 + cfg.fee)) / (1 - cfg.fee);
+    const be = pos.scale ? (pos.cost / pos.qtyInit) / ((1 - cfg.fee) * (1 - cfg.slip)) : (pos.entryPrice * (1 + cfg.fee)) / (1 - cfg.fee);
     raiseStop(pos, be, 'breakeven', at, '1차 목표 달성 후 본전으로 상향');
   }
   return pos.qty === 0;
@@ -108,6 +114,7 @@ export function toTrade(pos) {
   return {
     positionId: pos.id ?? null,
     strategy: strategySnapshot(pos.strategy),
+    ...(pos.scale ? { entries: structuredClone(pos.entries), scale: { ...pos.scale }, analysis: structuredClone(pos.analysis) } : {}),
     entryAt: pos.entryAt, exitAt: last.at,
     entryIdx: pos.entryIdx, exitIdx: last.idx ?? null,
     entryPrice: pos.entryPrice, exitPrice: qty ? pos.exits.reduce((a, e) => a + e.price * e.qty, 0) / qty : last.price,

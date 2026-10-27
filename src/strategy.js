@@ -47,6 +47,16 @@ export function scoreAt(d, I, i, enabled = ALL_FACTORS) {
 // 진입 시 손절가와 목표가(매도가)를 정한다. i = 신호가 난 마감 봉, price = 예상 체결가
 export function planEntry(d, I, i, price, cfg) {
   const atr = I.atr[i];
+  const defensive = cfg.strategy === 'defensive';
+  if (defensive) {
+    if (![price, atr, d[i]?.c, I.s20[i], cfg.fee, cfg.slip, cfg.minRR].every(Number.isFinite)
+      || price <= 0 || atr <= 0 || cfg.fee < 0 || cfg.fee >= 1 || cfg.slip < 0 || cfg.slip >= 1 || cfg.minRR <= 0) {
+      return { ok: false, reason: '진입 가격·지표·비용 설정이 유효하지 않음' };
+    }
+    const rawPrice = price / (1 + cfg.slip);
+    if (rawPrice - d[i].c > 0.5 * atr) return { ok: false, reason: '신호 종가 대비 0.5 ATR 초과 상승 · 추격매수 차단' };
+    if (rawPrice <= I.s20[i]) return { ok: false, reason: '주문 전 20이평 이탈 · 진입 차단' };
+  }
   let swingLow = Infinity, res = -Infinity;
   for (let j = Math.max(0, i - 9); j <= i; j++) swingLow = Math.min(swingLow, d[j].l);
   for (let j = Math.max(0, i - 59); j <= i; j++) res = Math.max(res, d[j].h);
@@ -60,13 +70,24 @@ export function planEntry(d, I, i, price, cfg) {
   const t2 = price + cfg.t2R * R;
   let note = '';
   // 60봉 고점(저항선)이 진입가보다 0.5 ATR 이상 위에 있으면 1차 목표를 그 아래로 당긴다
-  if (res > price + 0.5 * atr) {
+  if (res > price + (defensive ? 0 : 0.5 * atr)) {
     const capped = res - 0.2 * atr;
     const rr = (capped - price) / R;
     if (rr < cfg.minRR) {
       return { ok: false, reason: `저항선까지 손익비 ${rr.toFixed(2)} (기준 ${cfg.minRR})`, stop, t1, t2, R, res, atr };
     }
     if (capped < t1) { t1 = capped; note = '1차 목표가를 저항선 아래로 조정'; }
+  }
+  if (defensive) {
+    // 백테스트와 모의 브로커 양쪽보다 보수적인 매수 수수료 방식.
+    const qtyPerWon = (1 - cfg.fee) / price;
+    const net = p => qtyPerWon * p * (1 - cfg.slip) * (1 - cfg.fee);
+    const loss = 1 - net(stop), profit = net(t1) - 1;
+    const netRR = profit / loss;
+    if (!(stop > 0 && loss > 0 && Number.isFinite(netRR) && netRR >= cfg.minRR)) {
+      return { ok: false, reason: `비용 포함 1차 손익비 ${Number.isFinite(netRR) ? netRR.toFixed(2) : '계산 불가'} (기준 ${cfg.minRR})`, stop, t1, t2, R, res, atr, netRR };
+    }
+    return { ok: true, stop, t1, t2, R, res, atr, netRR, note: `${note}${note ? ' · ' : ''}비용 포함 손익비 ${netRR.toFixed(2)}` };
   }
   return { ok: true, stop, t1, t2, R, res, atr, note };
 }
