@@ -24,6 +24,12 @@ try {
       const fail = new Set();
       const networkFail = new Set();
       let controlDelay = 0;
+      // T-033 검증 탭 목업
+      const settingsItems = [['fee', 'FEE_RATE', '수수료율', .0004], ['slip', 'SLIPPAGE', '슬리피지', .0005], ['maxPositionKrw', 'MAX_POSITION_KRW', '1회 최대 매수 금액', 3000000], ['risk', 'RISK_PER_TRADE', '거래당 위험 비율', .02], ['entryScore', 'ENTRY_SCORE', '진입 점수 기준', 35]]
+        .map(([key, env, label, value]) => ({ key, env, label, value, base: value, overridden: false, pending: null }));
+      const settingsView = { enabled: true, items: settingsItems, pending: null, history: [] };
+      let verifyView = { enabled: true, session: null };
+      const settingsPosts = [];
       page.on('pageerror', e => errors.push(e.message));
       const status = { mode: 'paper', broker: '모의투자', market: 'KRW-BTC', unit: 240, price: 100800000, nextCandleAt: now + 14400000, halted: false, killed: false, config: { entryScore: 50, exitScore: 40, t1SellRatio: .5 }, summary: stats, balance: { krw: 10000000, coin: 0 }, position: null, signal: null };
       await page.route('**/*', async route => {
@@ -39,6 +45,21 @@ try {
           else if (url.pathname === '/api/trades') body = trades;
           else if (url.pathname === '/api/events') body = [{ at: now, type: 'start', msg: '모의투자 검증' }];
           else if (url.pathname === '/api/backtest') body = { ...chart, stats, trades, skipped: 0, equity: candles.map(() => 10010000), hold: candles.map(() => 10020000) };
+          else if (url.pathname === '/api/settings' && route.request().method() === 'GET') body = settingsView;
+          else if (url.pathname === '/api/settings') {
+            const { changes, reason } = route.request().postDataJSON();
+            settingsPosts.push(changes);
+            for (const [k, v] of Object.entries(changes)) Object.assign(settingsItems.find(i => i.key === k), { value: v, overridden: true });
+            settingsView.history.unshift({ at: now, status: 'applied', changes: Object.fromEntries(Object.entries(changes).map(([k, v]) => [k, { from: 0, to: v }])), reason });
+            body = { applied: true, pending: false, values: changes, settings: settingsView };
+          } else if (url.pathname === '/api/verify' && route.request().method() === 'GET') body = verifyView;
+          else if (url.pathname === '/api/verify') {
+            const { action, hours } = route.request().postDataJSON();
+            const checks = ['모의투자 모드', '매매 루프 연속성', '봉 마감 처리', '매매 루프 오류 없음', '매수 체결 금액·수수료', '매도 체결 대금·수수료', '손절가·목표가 순서'].map((label, i) => ({ key: 'c' + i, label, state: i > 3 ? 'wait' : 'ok', detail: '<b>x</b>' }));
+            const prev = verifyView.session;
+            verifyView = { enabled: true, session: { id: '1', state: action === 'start' ? 'running' : 'stopped', startedAt: now, endsAt: now + (hours ?? prev?.hours ?? 24) * 3600e3, hours: hours ?? prev?.hours ?? 24, market: 'KRW-BTC', progress: .25, candles: 1, fills: [{ at: now, type: 'buy', price: 100000000, amount: 3000000, fee: 1200, feeRate: .0004, maxPositionKrw: 3000000, ok: true }], warnings: [], failure: null, checks } };
+            body = verifyView;
+          } else if (url.pathname === '/api/verify/report') body = { id: '1', state: 'running', markdown: '# 실시간 모의투자 검증 1 · 진행 중' };
           else if (url.pathname === '/api/control') {
             const { action } = route.request().postDataJSON();
             actions.push(action);
@@ -48,7 +69,7 @@ try {
           } else throw new Error('예상하지 않은 API: ' + url.pathname);
           return route.fulfill({ json: body });
         }
-        const file = { '/': 'index.html', '/app.js': 'app.js', '/decision.js': 'decision.js', '/performance.js': 'performance.js', '/style.css': 'style.css' }[url.pathname];
+        const file = { '/': 'index.html', '/app.js': 'app.js', '/decision.js': 'decision.js', '/performance.js': 'performance.js', '/verify.js': 'verify.js', '/style.css': 'style.css' }[url.pathname];
         if (!file) return route.fulfill({ status: 404, body: '' });
         return route.fulfill({ body: await readFile(new URL('../web/' + file, import.meta.url)), contentType: file.endsWith('.css') ? 'text/css' : file.endsWith('.js') ? 'text/javascript' : 'text/html; charset=utf-8' });
       });
@@ -373,12 +394,14 @@ try {
         assert.equal(await page.locator('#tab-live').getAttribute('aria-selected'), 'true');
         assert.equal(await page.locator('#view-live').isVisible(), true);
         await page.keyboard.press('End');
-        assert.equal(await page.locator('#tab-performance').getAttribute('aria-selected'), 'true');
-        assert.equal(await page.locator('#tab-performance').getAttribute('aria-controls'), 'view-performance');
-        assert.equal(await page.locator('#view-performance').getAttribute('aria-labelledby'), 'tab-performance');
+        assert.equal(await page.locator('#tab-verify').getAttribute('aria-selected'), 'true');
+        assert.equal(await page.locator('#tab-verify').getAttribute('aria-controls'), 'view-verify');
+        assert.equal(await page.locator('#view-verify').getAttribute('aria-labelledby'), 'tab-verify');
         assert.equal(await page.locator('[role="tab"][tabindex="0"]').count(), 1);
         await page.keyboard.press('ArrowRight');
         assert.equal(await page.locator('#tab-live').getAttribute('aria-selected'), 'true');
+        await page.keyboard.press('ArrowLeft');
+        assert.equal(await page.locator('#view-verify').isVisible(), true);
         await page.keyboard.press('ArrowLeft');
         assert.equal(await page.locator('#view-performance').isVisible(), true);
       });
@@ -470,6 +493,44 @@ try {
         assert.match(await page.locator('#signal').textContent(), /현재 봉을 제외/);
         assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
         await page.screenshot({ path: resolve(out, `detail-${width}-${colorScheme}.png`), fullPage: true });
+      });
+      await check('검증 탭: 검증 시작·체결 대조·설정 변경', async () => {
+        await page.locator('#tab-verify').click();
+        await page.waitForFunction(() => document.querySelectorAll('#settings-table input').length === 5);
+        assert.match(await page.locator('#verify-state').textContent(), /아직 시작한 검증이 없습니다/);
+        assert.equal(await page.locator('#verify-session').isVisible(), false);
+        await page.locator('#verify-hours').fill('12');
+        await page.locator('#verify-start').click();
+        await page.waitForFunction(() => document.querySelector('#verify-badge').textContent === '진행 중');
+        assert.equal(await page.locator('#verify-checks tbody tr').count(), 7);
+        assert.equal(await page.locator('#verify-checks b').count(), 0, '내용은 이스케이프');
+        assert.match(await page.locator('#verify-fills').textContent(), /3,000,000/);
+        assert.equal(await page.locator('#verify-progress').getAttribute('aria-valuenow'), '25');
+        assert.equal(await page.locator('#verify-start').isDisabled(), true);
+        // 비율은 %로 입력 → 서버에는 소수로 보냄
+        await page.locator('#set-fee').fill('0.05');
+        await page.locator('#set-maxPositionKrw').fill('2000000');
+        await page.locator('#settings-reason').fill('시험');
+        await page.locator('#settings-save').click();
+        await page.waitForFunction(() => document.querySelector('#settings-status').textContent.includes('바로 적용'));
+        assert.deepEqual(settingsPosts.at(-1), { fee: .0005, maxPositionKrw: 2000000 });
+        assert.match(await page.locator('#settings-history').textContent(), /시험/);
+        await page.locator('#settings-save').click();
+        await page.waitForFunction(() => document.querySelector('#settings-status').textContent.includes('바꿀 값을 입력'));
+        assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+        await page.screenshot({ path: resolve(out, 'verify-' + width + '-' + colorScheme + '.png'), fullPage: true });
+        await page.locator('#verify-stop').click();
+        await page.waitForFunction(() => document.querySelector('#verify-badge').textContent === '중단');
+        await page.locator('#tab-live').click();
+      });
+      await check('실시간 탭 검증 실패 알림', async () => {
+        status.verify = { id: '1', state: 'failed', failure: { reason: '매매 루프 오류: 시험' }, finishedAt: now };
+        await page.evaluate(() => loadStatus());
+        await page.waitForFunction(() => !document.querySelector('#verify-alert').hidden);
+        assert.match(await page.locator('#verify-alert').textContent(), /실시간 검증 실패: 매매 루프 오류/);
+        delete status.verify;
+        await page.evaluate(() => loadStatus());
+        await page.waitForFunction(() => document.querySelector('#verify-alert').hidden);
       });
       await check('브라우저 오류 없음', async () => assert.deepEqual(errors, []));
       await page.close();

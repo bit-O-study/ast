@@ -8,12 +8,16 @@
 
 | 작업 | 담당 | 시작 | 메모 |
 |---|---|---|---|
+| T-033 | Claude | 2026-10-27 | 모의투자 실시간 검증·설정 즉시 변경 |
+| T-032 | Codex | 2026-10-27 | 변동성 상태별 진입 비교 |
 | T-032 | Codex | 2026-10-27 | 변동성 상태별 진입 비교 |
 
 ## 작업 목록
 
 | ID | 작업 | 담당 | 상태 | 선행 | 명세 |
 |---|---|---|---|---|---|
+| T-033 | 모의투자 실시간 검증·설정 즉시 변경 | Claude | 개발 중 · Claude (구현·V1/V2/브라우저 완료, 배포 후 24시간 V3) | 사용자 요청 | [T-033](../tasks/T-033-live-verify-settings.md) |
+| T-032 | 변동성 상태별 점수 진입 | Codex | 개발 중 · Codex | 사용자 지속 연구 | [T-032](../tasks/T-032-volatility-state.md) |
 | T-032 | 변동성 상태별 점수 진입 | Codex | 개발 중 · Codex | 사용자 지속 연구 | [T-032](../tasks/T-032-volatility-state.md) |
 | T-031 | 개발 PC Tailscale 복구 | Codex | 리뷰 대기 (Running·SSH 확인) | 사용자 복구 요청 | [T-031](../tasks/T-031-tailscale-repair.md) |
 | T-030 | 상승국면 눌림 회복 연구 | Codex | 리뷰 대기 (90개·전후보 탈락) | 사용자 지속 연구 | [T-030](../tasks/T-030-pullback-recovery.md) |

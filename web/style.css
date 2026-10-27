@@ -3,14 +3,14 @@
   --bg:#f2f4f7; --surface:#fff; --sunken:#e9edf2; --ink:#131a26; --muted:#5a6476; --line:#d8dee6;
   --accent:#9a5a06; --accent-soft:rgba(154,90,6,.10);
   --up:#d0303b; --down:#1f5ccc; --up-soft:rgba(208,48,59,.09); --down-soft:rgba(31,92,204,.09);
-  --warn:#b4530a; --ma1:#c28414; --ma2:#7a55c0; --band:rgba(80,100,135,.10);
+  --warn:#b4530a; --ok:#1a7f4b; --ok-soft:rgba(26,127,75,.10); --ma1:#c28414; --ma2:#7a55c0; --band:rgba(80,100,135,.10);
   --f-display:"Gothic A1","Malgun Gothic",sans-serif; --f-body:"IBM Plex Sans KR","Malgun Gothic",sans-serif; --f-mono:"JetBrains Mono",Consolas,monospace;
 }
 @media (prefers-color-scheme: dark){:root{
   --bg:#0e1218; --surface:#161b24; --sunken:#1d2430; --ink:#e5e9f0; --muted:#97a2b4; --line:#2a3240;
   --accent:#eaa944; --accent-soft:rgba(234,169,68,.13);
   --up:#ff5b66; --down:#5c9bff; --up-soft:rgba(255,91,102,.11); --down-soft:rgba(92,155,255,.11);
-  --warn:#f08a3c; --ma1:#eaa944; --ma2:#a986ef; --band:rgba(150,170,205,.09); color-scheme:dark;
+  --warn:#f08a3c; --ok:#4cc38a; --ok-soft:rgba(76,195,138,.12); --ma1:#eaa944; --ma2:#a986ef; --band:rgba(150,170,205,.09); color-scheme:dark;
 }}
 *{box-sizing:border-box}
 /* 숨김 상태는 패널과 확인창의 display 설정보다 우선합니다. */
@@ -156,3 +156,15 @@ tr:last-child td{border-bottom:0}
 .perf-filter { min-width: 0; padding: 14px 16px; }
 #perf-strategy { display: block; width: 100%; min-width: 0; max-width: 100%; margin-top: 8px; }
 #perf-month-input { font: inherit; width: 160px; max-width: 100%; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; color: var(--ink); background: var(--surface); }
+
+/* 검증 탭 */
+.tag.ok{color:var(--ok);background:var(--ok-soft)} .tag.fail{color:var(--up);background:var(--up-soft)} .tag.wait{color:var(--muted);background:var(--sunken)}
+.verify-head{padding:14px 16px;display:grid;grid-template-columns:minmax(0,1fr);gap:8px;margin:12px 0}
+.progress{height:8px;background:var(--sunken);border-radius:4px;overflow:hidden}
+.progress i{display:block;height:100%;background:var(--accent);width:0}
+.num-input{width:72px}
+.settings-form{padding:12px 16px;display:grid;grid-template-columns:minmax(0,1fr);gap:10px;margin:12px 0}
+.settings-form input[type=number]{width:140px}
+.report{white-space:pre-wrap;font:12px/1.6 var(--f-mono);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:12px;overflow:auto}
+#view-verify{grid-template-columns:minmax(0,1fr)}
+#verify-session{display:grid;grid-template-columns:minmax(0,1fr);gap:12px}

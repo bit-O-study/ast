@@ -13,8 +13,9 @@ const kstDay = (t) => new Date(t + 9 * 3600e3).toISOString().slice(0, 10);
 //  - 봉이 마감되면 판단 점수 계산 → 신규 진입 또는 보유 포지션 손절가 조정
 export class Trader {
   // now: 현재 시각 함수. 리플레이 검증에서는 가짜 시계를 넣는다
-  constructor({ cfg, client, broker, store, log = console.log, now = Date.now }) {
-    Object.assign(this, { cfg, client, broker, store, log, now });
+  // settings·verifier는 모의투자 전용 선택 기능 (src/settings.js, src/verify/live.js)
+  constructor({ cfg, client, broker, store, log = console.log, now = Date.now, settings = null, verifier = null }) {
+    Object.assign(this, { cfg, client, broker, store, log, now, settings, verifier });
     this.unitMs = cfg.unit * 60e3;
     this.strategy = getStrategy(cfg.strategy);
     this.candles = [];
@@ -71,6 +72,8 @@ export class Trader {
     if (this.busy) return;
     this.busy = true;
     try {
+      // 보유 중 대기한 설정 변경은 청산 뒤 첫 tick에 적용한다
+      if (!this.state.position) this.settings?.applyPending();
       this.price = (await this.client.ticker(this.cfg.market)).price;
       // 봉이 마감됐으면 손절가 조정·진입을 먼저 처리하고, 그 손절가로 현재가를 확인한다
       if (this.now() >= this.nextCandleAt) await this.onCandle();
@@ -82,6 +85,7 @@ export class Trader {
       this.emit('error', { msg: e.message });
     } finally {
       this.busy = false;
+      this.verifier?.onTick();
     }
   }
 
@@ -174,7 +178,7 @@ export class Trader {
     this.store.save();
     const w = (x) => Math.round(x).toLocaleString('ko-KR');
     this.emit('buy', { msg: `${pos.scale ? '1차 ' : ''}매수 ${w(fill.price)}원 × ${fill.qty.toFixed(8)} · 손절가 ${w(pos.stop)} · 1차 목표 ${w(pos.t1)} · 2차 목표 ${w(pos.t2)}`,
-      positionId: pos.id, price: fill.price, qty: fill.qty, stop: pos.stop, t1: pos.t1, t2: pos.t2, score: this.signal.score, ...(pos.scale ? { stage: 1 } : {}) });
+      positionId: pos.id, price: fill.price, qty: fill.qty, stop: pos.stop, t1: pos.t1, t2: pos.t2, score: this.signal.score, ...(pos.scale ? { stage: 1 } : {}), ...this.fillInfo(fill) });
   }
 
   async addPosition() {
@@ -190,7 +194,7 @@ export class Trader {
     this.bal = await this.broker.balance();
     this.store.save();
     this.emit('buy', { msg: `2차 매수 ${Math.round(fill.price).toLocaleString('ko-KR')}원 · 평균단가 ${Math.round(pos.entryPrice).toLocaleString('ko-KR')}원 · 총 매수 ${Math.round(pos.cost).toLocaleString('ko-KR')}원`,
-      positionId: pos.id, stage: 2, price: fill.price, qty: fill.qty, stop: pos.stop, t1: pos.t1, t2: pos.t2 });
+      positionId: pos.id, stage: 2, price: fill.price, qty: fill.qty, stop: pos.stop, t1: pos.t1, t2: pos.t2, ...this.fillInfo(fill) });
   }
 
   // 한 가격에서 1차·2차 목표가를 한꺼번에 넘을 수 있으므로 할 일이 없을 때까지 반복 (최대 3회)
@@ -209,7 +213,7 @@ export class Trader {
     this.bal = await this.broker.balance();
     const w = (x) => Math.round(x).toLocaleString('ko-KR');
     this.emit('sell', { msg: `${act.reason}: 매도 ${w(fill.price)}원 × ${fill.qty.toFixed(8)}${closed ? '' : ` · 남은 수량 손절가 ${w(pos.stop)}`}`,
-      positionId: pos.id, price: fill.price, qty: fill.qty, kind: act.kind, remaining: pos.qty });
+      positionId: pos.id, price: fill.price, qty: fill.qty, kind: act.kind, remaining: pos.qty, ...this.fillInfo(fill) });
     if (closed) {
       const trade = toTrade(pos);
       if (this.cfg.lossCooldownBars && trade.pnl <= 0) this.state.lastLossSignalAt = this.state.lastCandleT;
@@ -220,6 +224,14 @@ export class Trader {
       this.pushEquity();
     }
     this.store.save();
+  }
+
+  // 체결 이벤트에 남기는 대조 정보 (실시간 검증용)
+  fillInfo(fill) {
+    return {
+      ...(Number.isFinite(fill.cost) ? { cost: fill.cost } : {}), ...(Number.isFinite(fill.proceeds) ? { proceeds: fill.proceeds } : {}),
+      fee: fill.fee ?? null, feeRate: this.cfg.fee, maxPositionKrw: this.cfg.maxPositionKrw,
+    };
   }
 
   dailyBlocked() {
@@ -269,6 +281,7 @@ export class Trader {
       dailyBlocked: this.dailyBlocked(), nextCandleAt: this.nextCandleAt, lastError: this.lastError,
       signal: this.signal, position: pos && { ...pos, unrealized: pos.qty * this.price * (1 - this.cfg.fee) - pos.cost * (pos.qty / pos.qtyInit) },
       summary: computeStats(trades, eqSeries, this.state.startEquity),
+      ...(this.verifier ? { verify: this.verifier.summary() } : {}),
     };
   }
 

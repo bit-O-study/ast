@@ -19,7 +19,8 @@ async function readJson(req) {
   return raw ? JSON.parse(raw) : {};
 }
 
-export function createServer({ cfg, trader, client, store }) {
+// settings·verifier는 모의투자 전용 선택 기능. 없으면 해당 API는 404
+export function createServer({ cfg, trader, client, store, settings = null, verifier = null }) {
   const btCache = new Map();
   return http.createServer(async (req, res) => {
     const url = new URL(req.url, 'http://localhost');
@@ -44,6 +45,33 @@ export function createServer({ cfg, trader, client, store }) {
         });
       }
 
+      if (url.pathname.startsWith('/api/settings') || url.pathname.startsWith('/api/verify')) {
+        const tool = url.pathname.startsWith('/api/settings') ? settings : verifier;
+        if (!tool) return send(res, 404, { error: '모의투자에서만 쓸 수 있는 기능입니다' });
+        if (req.method === 'GET' && url.pathname === '/api/settings') return send(res, 200, settings.view());
+        if (req.method === 'POST' && url.pathname === '/api/settings') {
+          const { changes, reason } = await readJson(req);
+          return send(res, 200, { ...settings.request(changes, { reason }), settings: settings.view() });
+        }
+        if (req.method === 'POST' && url.pathname === '/api/settings/reset') {
+          const { keys } = await readJson(req);
+          return send(res, 200, { ...settings.reset(Array.isArray(keys) && keys.length ? keys : undefined), settings: settings.view() });
+        }
+        if (req.method === 'GET' && url.pathname === '/api/verify') return send(res, 200, verifier.view());
+        if (req.method === 'GET' && url.pathname === '/api/verify/report') {
+          const s = verifier.session;
+          if (!s) return send(res, 404, { error: '검증 기록이 없습니다' });
+          return send(res, 200, { id: s.id, state: s.state, markdown: verifier.report() });
+        }
+        if (req.method === 'POST' && url.pathname === '/api/verify') {
+          const { action, hours } = await readJson(req);
+          if (action === 'start') return send(res, 200, verifier.start({ hours }));
+          if (action === 'stop') return send(res, 200, verifier.stop());
+          return send(res, 400, { error: `알 수 없는 동작: ${action}` });
+        }
+        return send(res, 404, { error: '없는 주소입니다' });
+      }
+
       if (req.method === 'POST' && url.pathname === '/api/control') {
         const { action } = await readJson(req);
         if (action === 'pause') trader.pause();
@@ -63,7 +91,7 @@ export function createServer({ cfg, trader, client, store }) {
       }
       send(res, 404, { error: '없는 주소입니다' });
     } catch (e) {
-      send(res, 500, { error: e.message });
+      send(res, e.status ?? (e instanceof SyntaxError ? 400 : 500), { error: e.message });
     }
   });
 }

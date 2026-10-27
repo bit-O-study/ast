@@ -21,6 +21,7 @@
       <button role="tab" id="tab-live" aria-controls="view-live" tabindex="0" aria-selected="true">실시간</button>
       <button role="tab" id="tab-bt" aria-controls="view-bt" tabindex="-1" aria-selected="false">백테스트</button>
       <button role="tab" id="tab-performance" aria-controls="view-performance" tabindex="-1" aria-selected="false">성과</button>
+      <button role="tab" id="tab-verify" aria-controls="view-verify" tabindex="-1" aria-selected="false">검증</button>
     </nav>
   </div>
 </header>
@@ -30,6 +31,7 @@
   <!-- 실시간 -->
   <section id="view-live" role="tabpanel" aria-labelledby="tab-live">
     <div class="alert" id="alert" hidden></div>
+    <p class="alert" id="verify-alert" role="status" hidden></p>
     <div class="kpis" id="kpis"></div>
 
     <div class="grid">
@@ -125,6 +127,45 @@
       <div class="tbl-head"><h3 id="perf-day-title">날짜별 거래</h3><span id="perf-day-summary" class="small mono"></span></div>
       <div class="scroll"><table id="perf-trades"><thead><tr><th>결과</th><th>진입</th><th class="n">진입가</th><th class="n">손절가</th><th class="n">목표가</th><th>청산</th><th class="n">청산가</th><th>청산 사유</th><th class="n">순손익</th><th class="n">수익률</th></tr></thead><tbody></tbody></table></div>
     </div>
+  </section>
+  <!-- 모의투자 실시간 검증·설정 즉시 변경 -->
+  <section id="view-verify" role="tabpanel" aria-labelledby="tab-verify" hidden>
+    <p id="verify-state" class="muted small" role="status">검증 정보를 불러오는 중입니다.</p>
+    <div class="panel controls">
+      <div><h3>실시간 검증</h3><p class="muted small">실제 시세로 돌아가는 모의투자를 정해진 시간 동안 자동 점검합니다. 매매 판단에는 영향을 주지 않습니다.</p></div>
+      <div class="btns">
+        <label for="verify-hours" class="small">기간(시간)</label><input id="verify-hours" type="number" min="1" max="168" step="1" value="24" class="num-input">
+        <button class="btn primary" id="verify-start">검증 시작</button>
+        <button class="btn" id="verify-stop" hidden>검증 중단</button>
+        <button class="btn" id="verify-report-btn" hidden>보고서 보기</button>
+      </div>
+    </div>
+    <p class="alert" id="verify-status" role="status" hidden></p>
+    <div id="verify-session" hidden>
+      <div class="panel verify-head">
+        <div class="verify-title"><span class="tag" id="verify-badge">—</span> <strong id="verify-period" class="mono small"></strong></div>
+        <div class="progress" role="progressbar" aria-labelledby="verify-progress-label" aria-valuemin="0" aria-valuemax="100" id="verify-progress"><i></i></div>
+        <p class="muted small" id="verify-progress-label"></p>
+        <p class="warn-box" id="verify-failure" hidden></p>
+      </div>
+      <div class="scroll"><table id="verify-checks"><thead><tr><th>점검 항목</th><th>결과</th><th>내용</th></tr></thead><tbody></tbody></table></div>
+      <div class="tbl-head"><h3>체결 대조</h3></div>
+      <p class="muted small">금액·수수료·수량을 적용된 설정값으로 다시 계산해 비교합니다.</p>
+      <div class="scroll"><table id="verify-fills"><thead><tr><th>시각</th><th>구분</th><th class="n">체결가</th><th class="n">금액</th><th class="n">수수료</th><th class="n">수수료율</th><th class="n">1회 최대</th><th>대조</th></tr></thead><tbody></tbody></table></div>
+      <ul class="events" id="verify-warnings"></ul>
+      <pre class="report" id="verify-report" hidden></pre>
+    </div>
+
+    <div class="panel controls">
+      <div><h3>설정 즉시 변경</h3><p class="muted small">재시작 없이 바로 적용됩니다. 포지션을 보유 중이면 청산 후 적용합니다. 모의투자 전용이며, 바꾼 값은 서버 .env보다 우선합니다.</p></div>
+    </div>
+    <form id="settings-form" class="panel settings-form" novalidate>
+      <div class="scroll"><table id="settings-table"><thead><tr><th>설정</th><th class="n">현재값</th><th class="n">.env 값</th><th>새 값</th><th>상태</th></tr></thead><tbody></tbody></table></div>
+      <div class="btns"><label for="settings-reason" class="small">변경 사유</label><input id="settings-reason" type="text" maxlength="80" placeholder="선택"><button class="btn primary" type="submit" id="settings-save">변경 적용</button><button class="btn" type="button" id="settings-reset">.env 값으로 되돌리기</button></div>
+    </form>
+    <p class="alert" id="settings-status" role="status" hidden></p>
+    <div class="tbl-head"><h3>설정 변경 이력</h3></div>
+    <ul class="events" id="settings-history"></ul>
   </section>
 </main>
 <script src="/app.js"></script>

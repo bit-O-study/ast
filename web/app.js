@@ -38,6 +38,13 @@ const api = async (p, opt = {}, timeoutMs = 10000) => {
     throw e;
   } finally { clearTimeout(timer); }
 };
+let verifyTools = null, verifyView = null;
+import('/verify.js').then(module => {
+  verifyTools = module;
+  verifyView = module.createVerifyView({ $, api, kst, won, esc });
+  if (!$('#view-verify').hidden) loadVerify();
+  if (S.status) renderStatus(S.status);
+}).catch(() => { $('#verify-state').textContent = '검증 화면을 불러오지 못했습니다. 새로고침해 주세요.'; });
 const loading = new Set(), failures = new Map(), updated = new Map();
 async function refresh(key, label, action) {
   if (loading.has(key)) return;
@@ -145,6 +152,8 @@ function renderStatus(st) {
   if (st.lastError) alerts.push(`오류: ${st.lastError.message}`);
   if (st.killed) alerts.push('누적 손실 한도로 자동매매가 정지되었습니다.');
   $('#alert').hidden = !alerts.length; $('#alert').textContent = alerts.join(' · ');
+  const banner = verifyTools ? verifyTools.verifyBanner(st.verify) : '';
+  $('#verify-alert').hidden = !banner; $('#verify-alert').textContent = banner;
   $('#btn-pause').hidden = st.halted; $('#btn-resume').hidden = !st.halted || st.killed;
 
   const sm = st.summary;
@@ -311,6 +320,7 @@ function redraw() {
 
 // ───────── 데이터 갱신 ─────────
 function loadStatus() { return refresh('status', '계좌 상태', async () => { renderStatus(await api('/api/status')); redraw(); }); }
+function loadVerify() { if (verifyView) return refresh('verify', '검증 정보', () => verifyView.load()); }
 function loadChart() { return refresh('chart', '가격 차트', async () => { S.chart = await api('/api/chart'); redraw(); }); }
 function loadLists() {
   return Promise.all([
@@ -524,21 +534,26 @@ $('#perf-calendar').onkeydown = e => {
 };
 
 // ───────── 이벤트 ─────────
+const TABS = ['live', 'bt', 'performance', 'verify'];
 function showTab(name) {
-  for (const tab of ['live', 'bt', 'performance']) $('#tab-' + tab).tabIndex = tab === name ? 0 : -1;
+  for (const tab of TABS) $('#tab-' + tab).tabIndex = tab === name ? 0 : -1;
   $('#tab-live').setAttribute('aria-selected', name === 'live'); $('#tab-bt').setAttribute('aria-selected', name === 'bt');
   $('#view-live').hidden = name !== 'live'; $('#view-bt').hidden = name !== 'bt';
   $('#tab-performance').setAttribute('aria-selected', name === 'performance');
   $('#view-performance').hidden = name !== 'performance';
+  $('#tab-verify').setAttribute('aria-selected', name === 'verify');
+  $('#view-verify').hidden = name !== 'verify';
   if (name === 'performance') renderPerformance();
+  if (name === 'verify') loadVerify();
   if (name === 'bt' && !S.bt) runBacktest(); else redraw();
 }
 $('#tab-live').onclick = () => showTab('live');
 $('#tab-bt').onclick = () => showTab('bt');
 $('#tab-performance').onclick = () => showTab('performance');
+$('#tab-verify').onclick = () => showTab('verify');
 document.querySelector('.tabs').onkeydown = e => {
   if (e.target.getAttribute('role') !== 'tab' || e.altKey || e.ctrlKey || e.metaKey) return;
-  const tabs = ['live', 'bt', 'performance'], current = tabs.indexOf(e.target.id.slice(4));
+  const tabs = TABS, current = tabs.indexOf(e.target.id.slice(4));
   let next;
   if (e.key === 'ArrowRight') next = (current + 1) % tabs.length;
   else if (e.key === 'ArrowLeft') next = (current + tabs.length - 1) % tabs.length;
@@ -565,3 +580,4 @@ loadStatus(); loadChart(); loadLists();
 setInterval(loadStatus, 5000);
 setInterval(loadChart, 30000);
 setInterval(loadLists, 10000);
+setInterval(() => { if (!$('#view-verify').hidden) loadVerify(); }, 5000);

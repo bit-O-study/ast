@@ -41,6 +41,10 @@
 | `kill` | 킬 스위치 작동 |
 | `pause` / `resume` | 신규 진입 일시정지 / 재개 |
 | `ops` | 운영 상태 변화 (IP 변경, 시세 연결 끊김·복구 등) — T-004, T-005가 사용 |
+| `config` | 설정 즉시 변경 적용·대기 (T-033, paper) | `changes`({키: {from, to}}), `status`(applied·pending·applied-after-close) |
+| `verify` | 실시간 검증 시작·종료 (T-033, paper) | `state`(running·passed·failed·stopped), `failure` |
+
+- **체결 대조 선택 필드 (T-033)**: `buy`/`sell`에 `cost`(매수)·`proceeds`(매도), `fee`, `feeRate`, `maxPositionKrw`가 붙을 수 있습니다. 체결 당시 적용된 값입니다.
 
 구독: `store.onEvent(fn)` → 이벤트가 기록될 때마다 `fn(event)` 호출. 해제 함수를 돌려줍니다. 구독 함수가 예외를 던지거나 Promise가 reject돼도 매매 루프는 멈추지 않습니다 (`test/store.test.js`).
 
@@ -125,6 +129,13 @@ s.close();
 - **재구독**: 연결될 때마다 구독 요청을 다시 보냅니다.
 - **역순·중복 체결**: 종목별로 `trade_timestamp`가 마지막 값보다 이전인 체결은 `lastPrice`를 갱신하지 않습니다. 같은 `sequential_id`는 한 번만 `onTrade`로 넘깁니다 (최근 1,000개 기억).
 - `close()` 이후에는 어떤 경우에도 재연결하지 않습니다.
+
+## C10. 설정 즉시 변경·실시간 검증 (T-033, MODE=paper 전용)
+
+- 설정: `src/settings.js`의 `Settings`. 바꿀 수 있는 키는 `fee`, `slip`, `maxPositionKrw`, `risk`, `entryScore`뿐입니다. 손절·목표 규칙은 바꿀 수 없습니다. 포지션 보유 중 요청은 청산 뒤 첫 tick에 적용합니다. 변경값은 `state.settings.overrides`에 저장되며 `.env`보다 우선합니다. live에서는 적용하지 않습니다.
+- 검증: `src/verify/live.js`의 `LiveVerifier`. 세션은 `state.liveVerify`에 저장합니다. 매매 판단에 관여하지 않고 이벤트와 Trader 상태만 읽습니다.
+- Trader 연결: 생성자 선택 인자 `settings`, `verifier`. 없으면 기존 동작과 같습니다.
+- API: `GET/POST /api/settings`, `POST /api/settings/reset`, `GET/POST /api/verify`, `GET /api/verify/report`. 기능이 없으면 404, 잘못된 값은 400, 이미 진행 중이면 409입니다. `/api/status`에 선택 필드 `verify`(요약)가 붙습니다.
 
 ## C9. 의존성 예외
 
