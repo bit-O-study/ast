@@ -23,6 +23,7 @@
 | 2026-10-27 | T029/T030 국면손절·눌림회복 | V1/V2 | 전체257/257, 162개 비교5후보 모두 탈락. 후보15리플레이100%/오류0(그중RSI3개 무거래 제외), 기본3시장17/16/19거래100%. 원본SHA불변·미배포 | T029/T030 명세, logs/T030-tests-final.log, logs/T029-verify-final.log, logs/T029-replay.json, logs/T030-replay.json |
 | 2026-10-27 | T-031 로컬 Tailscale 복구 | V4 | NoState→tailscale up→Running, Health없음, 양측Online, 기존 호스트키 SSH hostname 확인. 서비스 재시작 권한거부 후 프로필 재연결로 해결 | T031 작업 로그, tailscale status 및 SSH exit0 |
 | 2026-10-27 | T-028 국면 동일 한도 비교 | V1 연구 전용 | 전용4건·전체252/252, 원본SHA3개/비교군18행 일치. 72개 비교 두 후보 모두 낙폭·전종목 기준 탈락. 샌드박스 실행기2건 시간 초과는 권한 확장 재검증 통과. 운영 변경 없음 | T028 명세, logs/T028-tests-final.log, logs/T028-results.json, docs/verify/2026-10-27_regime-comparable.md |
+| 2026-10-27 | T-037 3종목 동시 운용 연구 | V1 연구(운영 코드 미변경) | 7구간 합계·최악MDD: BTC300만 +43.9%/9.7%, 3종목×200만 +106.5%/12.1%, 3종목×300만 +159.8%/17.3%, BTC900만 +131.8%/26.4%. 같은 투입액이면 분산이 수익·MDD 모두 우위, 최근 상관 상승 | T-037 명세, logs/T037-portfolio.log |
 | 2026-10-27 | T-035 카카오톡 알림 실제 수신 | V4 | 개발 PC 로그인 테스트(11:51)·서버 운영 경로 테스트(12:05) 모두 사용자 카카오톡 "나와의 채팅"에서 수신 확인 | T-035 명세 |
 | 2026-10-27 | T-035 카카오톡 알림 | V1/브라우저 (V4 사용자 로그인 대기) | npm test 281/281(kakao 9), 격리 Chromium 204/204. 실제 카카오 전송은 미확인 | T-035 명세, test/kakao.test.js |
 | 2026-10-27 | T-033 실시간 검증·설정 즉시 변경 | V1/V2/브라우저 (V3는 배포 후 24시간 세션) | npm test 270/270, V2 3종목 진입·청산 100%·오류0, 격리 Chromium 204/204 | T-033 명세, docs/verify/2026-10-27_KRW-*_240_score_btc.md, logs/dashboard-check/result.json |
