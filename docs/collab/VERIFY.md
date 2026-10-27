@@ -18,10 +18,12 @@
 
 | 날짜 | 작업 | 단계 | 결과 | 근거 |
 |---|---|---|---|---|
+| 2026-10-27 | T034/T036 손실분해·이탈경계 | V1/V2 | 전체282/282,회계36건 기존비교군일치·손익항등식통과. 후보108행 전부탈락. 후보12리플레이 및 기본3시장100%/오류0. 운영 미변경 | T034/T036 명세, logs/T034-attribution.json, logs/T036-results.json, T036-replay.json, T036-tests-final.log, T036-verify-final.log |
 | 2026-10-27 | T032 변동성 상태 | V1/V2/공개 시세 | 전체259/259, 후보6리플레이/기본3시장100%·오류0. 탐색72행 고변동성 통과했으나 추가96행에서2023 전종목score초과 실패.2020~2022누락으로 미완료,API재조회 복구0/10봉. 최종 미채택 | T032 명세, logs/T032-tests-final.log, T032-verify-final.log, T032-gap-audit.json, T032-validation.json |
 | 2026-10-27 | T029/T030 국면손절·눌림회복 | V1/V2 | 전체257/257, 162개 비교5후보 모두 탈락. 후보15리플레이100%/오류0(그중RSI3개 무거래 제외), 기본3시장17/16/19거래100%. 원본SHA불변·미배포 | T029/T030 명세, logs/T030-tests-final.log, logs/T029-verify-final.log, logs/T029-replay.json, logs/T030-replay.json |
 | 2026-10-27 | T-031 로컬 Tailscale 복구 | V4 | NoState→tailscale up→Running, Health없음, 양측Online, 기존 호스트키 SSH hostname 확인. 서비스 재시작 권한거부 후 프로필 재연결로 해결 | T031 작업 로그, tailscale status 및 SSH exit0 |
 | 2026-10-27 | T-028 국면 동일 한도 비교 | V1 연구 전용 | 전용4건·전체252/252, 원본SHA3개/비교군18행 일치. 72개 비교 두 후보 모두 낙폭·전종목 기준 탈락. 샌드박스 실행기2건 시간 초과는 권한 확장 재검증 통과. 운영 변경 없음 | T028 명세, logs/T028-tests-final.log, logs/T028-results.json, docs/verify/2026-10-27_regime-comparable.md |
+| 2026-10-27 | T-035 카카오톡 알림 실제 수신 | V4 | 개발 PC 로그인 테스트(11:51)·서버 운영 경로 테스트(12:05) 모두 사용자 카카오톡 "나와의 채팅"에서 수신 확인 | T-035 명세 |
 | 2026-10-27 | T-035 카카오톡 알림 | V1/브라우저 (V4 사용자 로그인 대기) | npm test 281/281(kakao 9), 격리 Chromium 204/204. 실제 카카오 전송은 미확인 | T-035 명세, test/kakao.test.js |
 | 2026-10-27 | T-033 실시간 검증·설정 즉시 변경 | V1/V2/브라우저 (V3는 배포 후 24시간 세션) | npm test 270/270, V2 3종목 진입·청산 100%·오류0, 격리 Chromium 204/204 | T-033 명세, docs/verify/2026-10-27_KRW-*_240_score_btc.md, logs/dashboard-check/result.json |
 | 2026-10-27 | T-027 서버 설정 반영 | 운영 점검 | 서버 .env 신규(FEE_RATE=0.0004, MAX_POSITION_KRW=3000000) 후 재기동. 실행 중 /api/status config 반영·paper·무포지션·운영 점검 정상(10:48 KST). 새 매수 금액의 실제 체결은 다음 진입 때 확인 필요 | docs/setup/server-ssh.md 변경 기록 |
