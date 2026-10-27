@@ -59,6 +59,8 @@ ssh <계정>@<서버IP> hostname   # 접속 확인용 한 줄 실행
 
 ## 변경 기록
 
+2026-10-27 Claude (T-040, 사용자 지시): 13:20 KST 3종목 무포지션 확인. .env에 BOOST_POSITION_KRW=3000000 추가(키 없음). push로 CI 배포(T-040 코드 포함). 진행 중 V3 세션 202610271236은 유지.
+
 2026-10-27 Claude (T-007): 8783ef2 배포 후 3종목 상태·설정 확인, 12:36 KST 24시간 실시간 검증 세션 202610271236 시작.
 
 2026-10-27 Claude (T-007, 사용자 지시): 12:33 KST paper/무포지션 확인, 실시간 검증 세션 중단(보고서 보존). .env를 FEE_RATE=0.0004, MARKETS=KRW-BTC,KRW-ETH,KRW-XRP, MAX_POSITION_KRW=2000000, NOTIFY_KAKAO=on으로 교체(키 없음). push로 CI 배포.
