@@ -113,7 +113,11 @@ export class LiveVerifier {
     for (const e of events) {
       if (e.at < s.startedAt) continue;
       if (e.type === 'error') return fail('errors', `매매 루프 오류: ${e.msg}`);
-      if (e.type === 'start') s.warnings.push({ at: e.at, msg: '매매 프로세스 재시작' });
+      // 여러 종목 운용은 재시작 한 번에 종목마다 start가 남으므로 1분 안의 start는 한 건으로 센다
+      if (e.type === 'start') {
+        const prev = s.warnings.at(-1);
+        if (!(prev?.msg === '매매 프로세스 재시작' && e.at - prev.at < 60e3)) s.warnings.push({ at: e.at, msg: '매매 프로세스 재시작' });
+      }
       if (e.type === 'buy' || e.type === 'sell') {
         const bad = e.type === 'buy' ? checkBuy(e) : checkSell(e);
         const planBad = e.type === 'buy' ? checkPlan(e) : null;

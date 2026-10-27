@@ -160,3 +160,19 @@ test('API: 종목 선택, 전 종목 거래 합산, 일시정지는 전 종목, 
     assert.ok(x.traders.every((t) => t.state.halted));
   } finally { server.close(); }
 });
+
+test('실시간 검증: 여러 종목 재시작은 경고 1건으로 센다', async () => {
+  const x = setup();
+  await init(x);
+  const v = new LiveVerifier({ cfg: x.cfg, store: x.wallet, trader: x.traders[0], traders: x.traders, now: x.now });
+  x.traders[0].verifier = v;
+  v.start({ hours: 24 });
+  for (const t of x.traders) await t.init();
+  await x.traders[0].tick();
+  assert.equal(v.view().session.warnings.length, 1);
+  x.clock.t += 2 * MIN;
+  for (const t of x.traders) await t.init();
+  await x.traders[0].tick();
+  assert.equal(v.view().session.warnings.length, 2, '다른 재시작은 따로 센다');
+});
+
