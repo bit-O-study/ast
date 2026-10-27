@@ -29,7 +29,7 @@ try {
         .map(([key, env, label, value]) => ({ key, env, label, value, base: value, overridden: false, pending: null }));
       const settingsView = { enabled: true, items: settingsItems, pending: null, history: [] };
       let verifyView = { enabled: true, session: null };
-      const settingsPosts = [], notifyPosts = [];
+      const settingsPosts = [], notifyPosts = [], statusQueries = [];
       page.on('pageerror', e => errors.push(e.message));
       const status = { mode: 'paper', broker: '모의투자', market: 'KRW-BTC', unit: 240, price: 100800000, nextCandleAt: now + 14400000, halted: false, killed: false, config: { entryScore: 50, exitScore: 40, t1SellRatio: .5 }, summary: stats, balance: { krw: 10000000, coin: 0 }, position: null, signal: null };
       await page.route('**/*', async route => {
@@ -40,7 +40,7 @@ try {
           if (fail.has(url.pathname)) return route.fulfill({ status: 503, json: { error: '검증용 서버 오류' } });
           if (url.pathname === '/api/control' && controlDelay) await new Promise(r => setTimeout(r, controlDelay));
           let body;
-          if (url.pathname === '/api/status') body = status;
+          if (url.pathname === '/api/status') { statusQueries.push(url.search); body = url.searchParams.get('market') ? { ...status, market: url.searchParams.get('market') } : status; }
           else if (url.pathname === '/api/chart') body = chart;
           else if (url.pathname === '/api/trades') body = trades;
           else if (url.pathname === '/api/events') body = [{ at: now, type: 'start', msg: '모의투자 검증' }];
@@ -537,6 +537,29 @@ try {
         delete status.verify;
         await page.evaluate(() => loadStatus());
         await page.waitForFunction(() => document.querySelector('#verify-alert').hidden);
+      });
+      await check('여러 종목: 종목 선택과 포트폴리오 요약', async () => {
+        assert.equal(await page.locator('#market-select').isVisible(), false, '한 종목이면 숨김');
+        status.markets = ['KRW-BTC', 'KRW-ETH', 'KRW-XRP'];
+        status.portfolio = { equity: 10120000, cash: 6000000, startEquity: 10000000, dayStartEquity: 10000000, killed: false, dailyBlocked: false,
+          markets: [{ market: 'KRW-BTC', price: 100800000, coin: 0.02, value: 2016000, position: { entryPrice: 1e8, cost: 2e6, stop: 97000000, t1: 104000000, unrealized: 15000 }, score: 40, enter: true, halted: false, lastError: null },
+            { market: 'KRW-ETH', price: 5000000, coin: 0, value: 0, position: null, score: 12, enter: false, halted: false, lastError: null },
+            { market: '<b>KRW-XRP</b>', price: 3000, coin: 0, value: 0, position: null, score: null, enter: false, halted: false, lastError: { message: 'x' } }] };
+        await page.evaluate(() => loadStatus());
+        await page.waitForFunction(() => !document.querySelector('#portfolio').hidden);
+        assert.match(await page.locator('#portfolio').textContent(), /10,120,000원/);
+        assert.equal(await page.locator('#portfolio b b').count(), 0, '종목 이름 이스케이프');
+        assert.equal(await page.locator('#market-select button').count(), 3);
+        assert.equal(await page.locator('#market-select button[aria-pressed="true"]').textContent(), 'BTC');
+        await page.locator('#market-select button', { hasText: 'ETH' }).click();
+        await page.waitForFunction(() => document.querySelector('#market').textContent.includes('KRW-ETH'));
+        assert.ok(statusQueries.includes('?market=KRW-ETH'));
+        assert.equal(await page.locator('#market-select button[aria-pressed="true"]').textContent(), 'ETH');
+        assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+        await page.screenshot({ path: resolve(out, 'multi-' + width + '-' + colorScheme + '.png'), fullPage: true });
+        delete status.markets; delete status.portfolio;
+        await page.evaluate(() => { S.market = null; return loadStatus(); });
+        await page.waitForFunction(() => document.querySelector('#portfolio').hidden);
       });
       await check('브라우저 오류 없음', async () => assert.deepEqual(errors, []));
       await page.close();

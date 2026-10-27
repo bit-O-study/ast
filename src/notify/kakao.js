@@ -17,7 +17,8 @@ const labels = {
 
 export function formatKakao(event, { prefix = '[AST]' } = {}) {
   const at = new Date(event.at + 9 * 3600e3).toISOString().slice(5, 16).replace('T', ' ');
-  const text = `${prefix} ${labels[event.type] ?? event.type} · ${at}\n${event.msg}`;
+  const coin = typeof event.market === 'string' ? ` ${event.market.replace('KRW-', '')}` : '';
+  const text = `${prefix}${coin} ${labels[event.type] ?? event.type} · ${at}\n${event.msg}`;
   if (text.length <= MAX_TEXT) return text;
   return text.slice(0, MAX_TEXT - 1).replace(/[\uD800-\uDBFF]$/, '') + '…';
 }

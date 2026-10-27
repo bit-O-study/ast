@@ -8,7 +8,7 @@ import { promisify } from 'node:util';
 import { packageRelease } from '../scripts/deploy/package.mjs';
 const exec = promisify(execFile);
 const quote = s => "'" + s.replaceAll("'", "''") + "'";
-for (const scenario of ['success', 'short', 'halted', 'position', 'live', 'hash', 'path', 'extra', 'rollback', 'race', 'task', 'stop']) {
+for (const scenario of ['success', 'short', 'halted', 'position', 'portfolio', 'live', 'hash', 'path', 'extra', 'rollback', 'race', 'task', 'stop']) {
   test('배포 격리 PowerShell: ' + scenario, { skip: process.platform !== 'win32', timeout: 60000 }, async t => {
     const base = await mkdtemp(join(tmpdir(), 'ast-deploy-server-'));
     t.after(async () => { assert.ok(base.startsWith(join(tmpdir(), 'ast-deploy-server-'))); await rm(base, { recursive: true, force: true }); });
@@ -32,6 +32,7 @@ for (const scenario of ['success', 'short', 'halted', 'position', 'live', 'hash'
       "$global:state=[pscustomobject]@{mode='paper';position=$null;balance=[pscustomobject]@{coin=0;krw=10000000};halted=$false;killed=$false;lastError=$null}",
       "if ($scenario -eq 'halted') {$global:state.halted=$true}",
       "if ($scenario -eq 'position') {$global:state.position=@{qty=1}}",
+      "if ($scenario -eq 'portfolio') {$global:state | Add-Member portfolio ([pscustomobject]@{killed=$false;markets=@([pscustomobject]@{market='KRW-BTC';position=$null;coin=0;lastError=$null},[pscustomobject]@{market='KRW-ETH';position=@{qty=1};coin=1;lastError=$null})})}",
       "if ($scenario -eq 'live') {$global:state.mode='live'}",
       "function Get-ScheduledTask { param($TaskName) if ($scenario -eq 'task') {throw 'task mismatch'};return [pscustomobject]@{State='Running';Actions=@([pscustomobject]@{Arguments=('-NoProfile -NonInteractive -ExecutionPolicy Bypass -File '+[char]34+$live+'\\scripts\\server\\run-paper.ps1'+[char]34+' -ProjectRoot '+[char]34+$live+[char]34);WorkingDirectory=$live;Execute='C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe'})}}",
       "function Invoke-RestMethod { param($Uri,$Method,$Body,$ContentType,$TimeoutSec)",
@@ -64,7 +65,7 @@ for (const scenario of ['success', 'short', 'halted', 'position', 'live', 'hash'
     assert.equal(await readFile(join(live, 'data/state.json'), 'utf8'), 'old');
     assert.equal(result.running, true);
     assert.equal(result.halted, scenario === 'halted', JSON.stringify(result));
-    if (['position', 'live', 'hash', 'path', 'extra', 'race', 'task'].includes(scenario)) assert.equal(result.stops, 0);
+    if (['position', 'portfolio', 'live', 'hash', 'path', 'extra', 'race', 'task'].includes(scenario)) assert.equal(result.stops, 0);
     if (scenario === 'rollback') assert.equal(result.stops, 2);
   });
 }

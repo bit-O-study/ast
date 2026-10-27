@@ -35,8 +35,9 @@ export function validateChanges(changes, cfg) {
 
 export class Settings {
   // emit(type, data): Trader 이벤트 기록. hasPosition(): 보유 여부
-  constructor({ cfg, store, now = Date.now, emit = () => {}, hasPosition = () => false }) {
-    Object.assign(this, { cfg, store, now, emit, hasPosition });
+  // mirrors: 여러 종목 운용 시 종목별 cfg 복사본. 변경을 함께 반영한다
+  constructor({ cfg, store, now = Date.now, emit = () => {}, hasPosition = () => false, mirrors = [] }) {
+    Object.assign(this, { cfg, store, now, emit, hasPosition, mirrors });
     this.base = pick(cfg); // 시작 시점 .env 값
     this.enabled = cfg.mode === 'paper';
     const s = store.state.settings ??= {};
@@ -46,7 +47,7 @@ export class Settings {
     // 저장된 변경값은 paper에서만 다시 적용한다
     if (this.enabled) {
       const { ok, values } = validateChanges(s.overrides, cfg);
-      if (ok) Object.assign(cfg, values); else if (Object.keys(s.overrides).length) s.overrides = {};
+      if (ok) for (const c of [cfg, ...mirrors]) Object.assign(c, values); else if (Object.keys(s.overrides).length) s.overrides = {};
     }
   }
 
@@ -91,7 +92,7 @@ export class Settings {
 
   apply(values, reason, status) {
     const changes = this.record(status, values, reason);
-    Object.assign(this.cfg, values);
+    for (const c of [this.cfg, ...this.mirrors]) Object.assign(c, values);
     for (const [k, v] of Object.entries(values)) {
       if (v === this.base[k]) delete this.s.overrides[k]; else this.s.overrides[k] = v;
     }

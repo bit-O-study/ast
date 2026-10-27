@@ -17,7 +17,9 @@ const kst = (t, withYear) => {
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 const STOP_LABEL = { initial: '초기 손절가', breakeven: '본전 손절가', trail: '추적 손절가', breach: '이탈 경계 손절가', timeout: '보유기간 경계 손절가' };
 
-const S = { status: null, chart: null, trades: [], filter: 'all', bt: null, hover: {} };
+const S = { status: null, chart: null, trades: [], filter: 'all', bt: null, hover: {}, market: null };
+// 여러 종목 운용(T-007)에서 고른 종목. null이면 서버 기본(첫 종목)
+const mq = (sep = '?') => S.market ? sep + 'market=' + encodeURIComponent(S.market) : '';
 import('/decision.js').then(module => {
   decisionTools = module;
   if (S.status) { renderPosition(S.status); renderSignal(S.status.signal, S.status.config, S.status.strategy); }
@@ -160,6 +162,37 @@ function renderStatus(st) {
   $('#kpis').innerHTML = kpiHtml(sm, `<div class="kpi"><div class="l">보유 현금 · 코인</div><div class="v">${won(st.balance?.krw)}</div><div class="s">${(st.balance?.coin ?? 0).toFixed(6)} ${st.market.split('-')[1]}</div></div>`);
   renderPosition(st);
   renderSignal(st.signal, st.config, st.strategy);
+  renderPortfolio(st);
+}
+
+// 여러 종목 운용: 종목 선택 버튼과 계좌 요약
+function renderPortfolio(st) {
+  const sel = $('#market-select'), pf = st.portfolio;
+  sel.hidden = !st.markets; $('#portfolio').hidden = !pf;
+  if (!st.markets) return;
+  const current = S.market ?? st.market;
+  const want = st.markets.map((m) => m + (m === current ? '1' : '0')).join();
+  if (sel.dataset.state !== want) {
+    sel.dataset.state = want;
+    sel.innerHTML = st.markets.map((m) => `<button type="button" data-market="${esc(m)}" aria-pressed="${m === current}">${esc(m.replace('KRW-', ''))}</button>`).join('');
+    sel.querySelectorAll('button').forEach((b) => (b.onclick = () => selectMarket(b.dataset.market)));
+  }
+  if (!pf) return;
+  const pnl = pf.equity - pf.startEquity;
+  $('#portfolio').innerHTML = `<div class="pf-head"><h3>포트폴리오</h3><span class="mono">평가금액 <b>${won(pf.equity)}원</b> · <span class="${cls(pnl)}">${signedWon(pnl)}</span> · 현금 ${won(pf.cash)}원${pf.killed ? ' · <b class="neg">킬 스위치 정지</b>' : pf.dailyBlocked ? ' · 일일 손실 한도 도달' : ''}</span></div>`
+    + '<div class="scroll"><table><thead><tr><th>종목</th><th class="n">현재가</th><th class="n">보유 평가</th><th class="n">평가손익</th><th class="n">손절가</th><th class="n">점수</th></tr></thead><tbody>'
+    + pf.markets.map((m) => `<tr><td><button type="button" class="link" data-market="${esc(m.market)}">${esc(m.market.replace('KRW-', ''))}</button>${m.lastError ? ' <span class="tag fail">오류</span>' : ''}</td><td class="n mono">${won(m.price)}</td>`
+      + `<td class="n mono">${m.position ? won(m.value) + '원' : '—'}</td><td class="n mono ${m.position ? cls(m.position.unrealized) : ''}">${m.position ? signedWon(m.position.unrealized) : '—'}</td>`
+      + `<td class="n mono">${m.position ? won(m.position.stop) : '—'}</td><td class="n mono">${fin(m.score) ? m.score.toFixed(0) + (m.enter ? ' 매수' : '') : '—'}</td></tr>`).join('')
+    + '</tbody></table></div>';
+  $('#portfolio').querySelectorAll('button.link').forEach((b) => (b.onclick = () => selectMarket(b.dataset.market)));
+}
+
+function selectMarket(m) {
+  if (m === (S.market ?? S.status?.market)) return;
+  S.market = m; S.chart = null; S.bt = null;
+  loadStatus(); loadChart();
+  if (!$('#view-bt').hidden) runBacktest();
 }
 
 // ───────── 차트 ─────────
@@ -319,9 +352,9 @@ function redraw() {
 }
 
 // ───────── 데이터 갱신 ─────────
-function loadStatus() { return refresh('status', '계좌 상태', async () => { renderStatus(await api('/api/status')); redraw(); }); }
+function loadStatus() { return refresh('status', '계좌 상태', async () => { renderStatus(await api('/api/status' + mq())); redraw(); }); }
 function loadVerify() { if (verifyView) return refresh('verify', '검증 정보', () => verifyView.load()); }
-function loadChart() { return refresh('chart', '가격 차트', async () => { S.chart = await api('/api/chart'); redraw(); }); }
+function loadChart() { return refresh('chart', '가격 차트', async () => { S.chart = await api('/api/chart' + mq()); redraw(); }); }
 function loadLists() {
   return Promise.all([
     refresh('trades', '거래 내역', async () => { S.trades = await api('/api/trades'); renderTrades(); performanceState.loaded = true; renderPerformance(); }),
@@ -341,7 +374,7 @@ async function runBacktest() {
   }
   S.hover['cv-bt'] = null; $('#tip-bt').hidden = true;
   try {
-    S.bt = await api('/api/backtest?count=' + $('#bt-count').value, {}, 120000);
+    S.bt = await api('/api/backtest?count=' + $('#bt-count').value + mq('&'), {}, 120000);
     const s = S.bt.stats, diff = s.ret - s.holdRet;
     $('#bt-kpis').innerHTML = kpiHtml(s, `<div class="kpi"><div class="l">단순 보유 대비</div><div class="v ${cls(diff)}">${sgn(diff)}${Math.abs(diff).toFixed(1)}%p</div><div class="s">보유 시 ${signedPct(s.holdRet, 1)} · 보류 신호 ${S.bt.skipped}건</div></div>`);
     $('#bt-trades tbody').innerHTML = tradeRows(S.bt.trades);

@@ -40,13 +40,13 @@ export function checkPlan(e) {
 }
 
 export class LiveVerifier {
-  // trader: { cfg, state, unitMs }, reportDir: 보고서 저장 폴더
-  constructor({ cfg, store, trader, now = Date.now, reportDir = path.join(store.dir, 'verify') }) {
-    Object.assign(this, { cfg, store, trader, now, reportDir });
+  // trader: 세션을 저장하는 첫 종목, traders: 점검할 전 종목 (기본 [trader]), reportDir: 보고서 저장 폴더
+  constructor({ cfg, store, trader, traders = [trader], now = Date.now, reportDir = path.join(store.dir, 'verify') }) {
+    Object.assign(this, { cfg, store, trader, traders, now, reportDir });
     this.enabled = cfg.mode === 'paper';
     // 매매 루프가 남기는 이벤트를 받아 두었다가 tick 때 점검한다 (파일을 다시 읽지 않음)
     this.queue = [];
-    store.onEvent((e) => { if (this.session?.state === 'running' && e.type !== 'verify') this.queue.push(e); });
+    for (const st of new Set(traders.map((t) => t.store))) st.onEvent((e) => { if (this.session?.state === 'running' && e.type !== 'verify') this.queue.push(e); });
   }
 
   get session() { return this.store.state.liveVerify ?? null; }
@@ -60,7 +60,7 @@ export class LiveVerifier {
     this.store.state.liveVerify = {
       id: new Date(t + 9 * 3600e3).toISOString().slice(0, 16).replace(/[-:T]/g, ''),
       state: 'running', startedAt: t, endsAt: t + h * 3600e3, hours: h,
-      unit: this.cfg.unit, market: this.cfg.market,
+      unit: this.cfg.unit, market: this.traders.map((t) => t.cfg.market).join(','),
       config: { fee: this.cfg.fee, slip: this.cfg.slip, maxPositionKrw: this.cfg.maxPositionKrw, risk: this.cfg.risk, entryScore: this.cfg.entryScore },
       lastTickAt: t, startCandleT: this.trader.state.lastCandleT ?? null, candles: 0, lastCandleT: this.trader.state.lastCandleT ?? null,
       fills: [], warnings: [], failure: null, finishedAt: null, report: null,
@@ -92,13 +92,22 @@ export class LiveVerifier {
     if (t - s.lastTickAt > MAX_GAP_MS) return fail('loop', `매매 루프가 ${Math.round((t - s.lastTickAt) / 60e3)}분 동안 멈췄습니다`);
     s.lastTickAt = t;
 
-    if (Number.isFinite(st.lastCandleT) && st.lastCandleT !== s.lastCandleT) {
-      if (Number.isFinite(s.lastCandleT) && st.lastCandleT > s.lastCandleT) s.candles += Math.round((st.lastCandleT - s.lastCandleT) / unitMs);
-      s.lastCandleT = st.lastCandleT;
+    // 종목별 봉 마감 처리. 첫 종목은 기존 세션 필드(lastCandleT·candles)를 이어 쓴다
+    s.perMarket ??= {};
+    for (const tr of this.traders) {
+      const m = tr.cfg.market, lt = tr.state.lastCandleT;
+      const c = (s.perMarket[m] ??= tr === this.trader ? { lastCandleT: s.lastCandleT, candles: s.candles } : { lastCandleT: lt ?? null, candles: 0 });
+      if (Number.isFinite(lt) && lt !== c.lastCandleT) {
+        if (Number.isFinite(c.lastCandleT) && lt > c.lastCandleT) c.candles += Math.round((lt - c.lastCandleT) / unitMs);
+        c.lastCandleT = lt;
+      }
+      if (Number.isFinite(c.lastCandleT) && t > c.lastCandleT + 2 * unitMs + MAX_GAP_MS) {
+        return fail('candle', `${m} ${new Date(c.lastCandleT + 2 * unitMs + 9 * 3600e3).toISOString().slice(5, 16).replace('T', ' ')} KST 마감 봉을 10분 넘게 처리하지 못했습니다`);
+      }
     }
-    if (Number.isFinite(s.lastCandleT) && t > s.lastCandleT + 2 * unitMs + MAX_GAP_MS) {
-      return fail('candle', `${new Date(s.lastCandleT + 2 * unitMs + 9 * 3600e3).toISOString().slice(5, 16).replace('T', ' ')} KST 마감 봉을 10분 넘게 처리하지 못했습니다`);
-    }
+    // 화면·판정은 가장 적게 처리한 종목 기준
+    s.candles = Math.min(...Object.values(s.perMarket).map((c) => c.candles));
+    s.lastCandleT = s.perMarket[this.trader.cfg.market].lastCandleT;
 
     const events = this.queue.splice(0);
     for (const e of events) {
@@ -108,7 +117,7 @@ export class LiveVerifier {
       if (e.type === 'buy' || e.type === 'sell') {
         const bad = e.type === 'buy' ? checkBuy(e) : checkSell(e);
         const planBad = e.type === 'buy' ? checkPlan(e) : null;
-        s.fills.push({ at: e.at, type: e.type, stage: e.stage ?? null, price: e.price, qty: e.qty, amount: e.type === 'buy' ? e.cost : e.proceeds,
+        s.fills.push({ at: e.at, market: e.market ?? null, type: e.type, stage: e.stage ?? null, price: e.price, qty: e.qty, amount: e.type === 'buy' ? e.cost : e.proceeds,
           fee: e.fee, feeRate: e.feeRate, maxPositionKrw: e.maxPositionKrw ?? null, ok: !bad && !planBad });
         if (bad) return fail(e.type === 'buy' ? 'buys' : 'sells', bad);
         if (planBad) return fail('plan', planBad);
@@ -142,7 +151,10 @@ export class LiveVerifier {
       if (s.failure?.key === key) return { key, label, state: 'fail', detail: s.failure.reason };
       if ((key === 'buys' || key === 'plan') && !has('buy')) return { key, label, state: 'wait', detail: '아직 매수 없음' };
       if (key === 'sells' && !has('sell')) return { key, label, state: 'wait', detail: '아직 매도 없음' };
-      if (key === 'candle') return { key, label, state: s.candles || s.state === 'passed' ? 'ok' : 'wait', detail: `봉 마감 ${s.candles}개 처리` };
+      if (key === 'candle') {
+        const per = s.perMarket && Object.keys(s.perMarket).length > 1 ? ` (${Object.entries(s.perMarket).map(([m, c]) => `${m.replace('KRW-', '')} ${c.candles}`).join(' · ')})` : '';
+        return { key, label, state: s.candles || s.state === 'passed' ? 'ok' : 'wait', detail: `봉 마감 ${s.candles}개 처리${per}` };
+      }
       return { key, label, state: s.state === 'failed' ? 'wait' : 'ok', detail: '' };
     });
   }

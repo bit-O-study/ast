@@ -24,6 +24,8 @@ export function buildConfig(env = process.env) {
     accessKey: env.BITHUMB_ACCESS_KEY || '',
     secretKey: env.BITHUMB_SECRET_KEY || '',
     market: env.MARKET || 'KRW-BTC',
+    // 여러 종목 동시 운용 (T-007). 비어 있으면 MARKET 한 종목
+    markets: [],
     unit: num(env, 'CANDLE_UNIT', 240),
     strategy: env.STRATEGY || 'score',
     scaleIn: env.SCALE_IN === undefined ? env.STRATEGY === 'structure' : env.SCALE_IN === 'true',
@@ -63,6 +65,10 @@ export function buildConfig(env = process.env) {
   if (cfg.scaleIn && cfg.mode !== 'paper') throw new Error('분할매수는 현재 MODE=paper에서 검증 중입니다');
   if (cfg.scaleIn && cfg.strategy !== 'structure') throw new Error('분할매수는 STRATEGY=structure에서 사용합니다');
   if (cfg.scaleIn && (!(cfg.fee >= 0 && cfg.fee < 1) || !(cfg.slip >= 0 && cfg.slip < 1) || !(cfg.risk > 0 && cfg.risk <= 1) || !(cfg.maxPositionKrw > 0) || !(cfg.minOrderKrw > 0) || !(cfg.minRR > 0) || !(cfg.t1SellRatio > 0 && cfg.t1SellRatio < 1))) throw new Error('분할매수 비용·위험·주문·분할매도 설정 범위를 확인하세요');
+  cfg.markets = [...new Set((env.MARKETS || '').split(',').map((m) => m.trim().toUpperCase()).filter(Boolean))];
+  if (cfg.markets.some((m) => !/^KRW-[A-Z0-9]+$/.test(m))) throw new Error(`MARKETS 형식이 올바르지 않습니다 (예: KRW-BTC,KRW-ETH)`);
+  if (cfg.markets.length) cfg.market = cfg.markets[0];
+  if (cfg.markets.length > 1 && cfg.mode !== 'paper') throw new Error('여러 종목 동시 운용은 현재 MODE=paper에서 검증 중입니다');
   if (!['on', 'off'].includes(cfg.notifyKakao)) throw new Error(`NOTIFY_KAKAO는 on 또는 off 여야 합니다 (현재 ${cfg.notifyKakao})`);
   if (![1, 3, 5, 10, 15, 30, 60, 240].includes(cfg.unit)) throw new Error(`CANDLE_UNIT ${cfg.unit} 은 빗썸이 지원하지 않습니다`);
   if (cfg.t2R <= cfg.t1R) throw new Error('T2_R은 T1_R보다 커야 합니다');

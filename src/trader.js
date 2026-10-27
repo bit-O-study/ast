@@ -14,8 +14,9 @@ const kstDay = (t) => new Date(t + 9 * 3600e3).toISOString().slice(0, 10);
 export class Trader {
   // now: 현재 시각 함수. 리플레이 검증에서는 가짜 시계를 넣는다
   // settings·verifier는 모의투자 전용 선택 기능 (src/settings.js, src/verify/live.js)
-  constructor({ cfg, client, broker, store, log = console.log, now = Date.now, settings = null, verifier = null }) {
-    Object.assign(this, { cfg, client, broker, store, log, now, settings, verifier });
+  // portfolio: 여러 종목 동시 운용 시 계좌 단위 위험 판단 (src/portfolio.js)
+  constructor({ cfg, client, broker, store, log = console.log, now = Date.now, settings = null, verifier = null, portfolio = null }) {
+    Object.assign(this, { cfg, client, broker, store, log, now, settings, verifier, portfolio });
     this.unitMs = cfg.unit * 60e3;
     this.strategy = getStrategy(cfg.strategy);
     this.candles = [];
@@ -36,8 +37,8 @@ export class Trader {
   get state() { return this.store.state; }
 
   emit(type, data) {
-    const e = this.store.event(type, { at: this.now(), ...data });
-    this.log(`[${new Date(e.at).toLocaleString('ko-KR')}] ${type} ${data.msg ?? ''}`);
+    const e = this.store.event(type, { at: this.now(), market: this.cfg.market, ...data });
+    this.log(`[${new Date(e.at).toLocaleString('ko-KR')}] ${this.portfolio ? this.cfg.market + ' ' : ''}${type} ${data.msg ?? ''}`);
   }
 
   // 시세·잔고·봉을 읽고 기준점을 잡는다 (매매하지 않음)
@@ -161,7 +162,8 @@ export class Trader {
     const plan = planEntry(d, this.I, i, price * (1 + this.cfg.slip), this.cfg);
     if (!plan.ok) { this.emit('skip', { msg: `매수 신호 ${this.signal.score.toFixed(0)}점, 진입 보류: ${plan.reason}` }); return; }
     this.bal = await this.broker.balance();
-    const eq = this.equity(price);
+    // 위험 비율은 계좌 평가금액 기준 (포트폴리오면 전 종목 합계)
+    const eq = this.portfolio ? this.portfolio.equity() : this.equity(price);
     const allocation = this.cfg.scaleIn ? firstAllocation({ cash: this.bal.krw, equity: eq, price: price * (1 + this.cfg.slip), plan, atr: this.I.atr[i], signalAt: d[i].t }, this.cfg) : null;
     if (this.cfg.scaleIn && !allocation) { this.emit('skip', { msg: '분할 예산·비용 반영 손익비 부족' }); return; }
     const krw = allocation?.cost ?? Math.min(((eq * this.cfg.risk) / plan.R) * price * (1 + this.cfg.fee), this.bal.krw * 0.999, this.cfg.maxPositionKrw);
@@ -235,10 +237,12 @@ export class Trader {
   }
 
   dailyBlocked() {
+    if (this.portfolio) return this.portfolio.dailyBlocked();
     return this.equity() <= this.state.dayStartEquity * (1 - this.cfg.dailyLossLimit);
   }
 
   async checkRisk(price) {
+    if (this.portfolio) return this.portfolio.checkRisk();
     const eq = this.equity(price);
     const today = kstDay(this.now());
     if (this.state.day !== today) { this.state.day = today; this.state.dayStartEquity = eq; this.store.save(); }

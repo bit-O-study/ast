@@ -140,6 +140,16 @@ s.close();
 - Trader 연결: 생성자 선택 인자 `settings`, `verifier`. 없으면 기존 동작과 같습니다.
 - API: `GET/POST /api/settings`, `POST /api/settings/reset`, `GET/POST /api/verify`, `GET /api/verify/report`. 기능이 없으면 404, 잘못된 값은 400, 이미 진행 중이면 409입니다. `/api/status`에 선택 필드 `verify`(요약)가 붙습니다.
 
+## C11. 여러 종목 동시 운용 (T-007, MODE=paper 전용)
+
+- 설정: `MARKETS=KRW-BTC,KRW-ETH,KRW-XRP`. 첫 종목이 `cfg.market`이 됩니다. 비어 있으면 `MARKET` 한 종목으로 기존과 같게 동작합니다.
+- 종목별 Trader가 하나씩 돌고, 진입·청산 규칙은 종목별로 기존과 같습니다. 종목별 cfg는 기본 cfg를 복사한 것이며 `market`만 다릅니다. 설정 즉시 변경은 `Settings({ mirrors })`로 모든 복사본에 반영됩니다.
+- 저장소: 첫 종목은 `data/paper`(기존), 나머지는 `data/paper/<종목>`입니다. 공유 현금은 `data/paper/state.json`의 `paper.krw`입니다. 코인은 첫 종목이 `paper.coin`, 나머지는 `paper.coins[종목]`입니다(`PaperBroker(store, cfg, { primary })`).
+- `Portfolio`(src/portfolio.js): 계좌 평가금액, 일일 손실 한도, 킬 스위치(전 종목 매도), 일시정지·재개·전량 매도를 계좌 단위로 처리합니다. 상태는 `state.portfolio`에 둡니다. Trader 선택 인자는 `portfolio`이며, 있으면 `dailyBlocked`·`checkRisk`·진입 위험 계산을 위임합니다.
+- 이벤트에 `market` 필드가 붙습니다(C2 추가 필드).
+- API: `?market=`로 종목을 고릅니다(없으면 첫 종목, 모르는 종목이면 400). `/api/status`에 `markets`, `portfolio` 선택 필드가 붙습니다. `/api/trades`·`/api/events`는 market이 없으면 전 종목을 합칩니다.
+- 배포: `portfolio.markets` 중 하나라도 포지션·코인·오류가 있으면 배포를 중단합니다.
+
 ## C9. 의존성 예외
 
 - `ws` 패키지: Node 20에는 기본 WebSocket이 없어 T-005에서 추가를 허용합니다. `globalThis.WebSocket`이 있으면 그것을 먼저 씁니다.

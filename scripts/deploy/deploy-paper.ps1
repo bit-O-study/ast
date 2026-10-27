@@ -21,6 +21,11 @@ function Assert-Paper($status) {
   if ($status.mode -ne 'paper' -or $null -ne $status.position -or $status.balance.coin -ne 0 -or $status.lastError -or $status.killed) {
     throw '정상 무포지션 모의투자 상태에서만 배포할 수 있습니다.'
   }
+  # 여러 종목 운용(T-007): 다른 종목 포지션·코인·오류도 확인한다
+  if ($status.portfolio) {
+    $busy=@($status.portfolio.markets | Where-Object { $null -ne $_.position -or $_.coin -ne 0 -or $_.lastError })
+    if ($busy.Count -gt 0 -or $status.portfolio.killed) { throw '정상 무포지션 모의투자 상태에서만 배포할 수 있습니다.' }
+  }
 }
 function Stop-App {
   Disable-ScheduledTask -TaskName $TaskName | Out-Null
