@@ -59,6 +59,8 @@ ssh <계정>@<서버IP> hostname   # 접속 확인용 한 줄 실행
 
 ## 변경 기록
 
+2026-10-27 Claude (T-035, 사용자 지시): 개발 PC에서 카카오 로그인(health_app과 같은 카카오 앱, 등록된 127.0.0.1:3000 콜백 재사용, 앱 설정 미변경) 후 토큰 파일을 C:\ast\data\kakao-token.json에 복사(380B, 내용 미열람). .env에 NOTIFY_KAKAO=on 추가. 12:02 KST paper/무포지션 확인 후 push로 CI 배포.
+
 2026-10-27 Claude (T-033): 651f76d CI 자동 배포 후 /api/settings·/api/verify 응답 확인. paper/무포지션/운영 점검 정상(11:17 KST). POST /api/verify 24시간 세션 202610271118 시작. 설정 변경 없음.
 
 2026-10-27 Claude (T-027, 사용자 지시): 서버에 .env가 없어 코드 기본값(수수료0.25%·1회100만)으로 운영 중이었다. C:ast.env를 새로 만들어 FEE_RATE=0.0004, MAX_POSITION_KRW=3000000 두 줄만 넣었다(키·MODE 없음, 실행기가 paper 강제, 배포는 .env 미교체). 첫 작성은 원격 따옴표 처리로 내용이 깨져 scp 파일로 덮어썼다. 10:45 KST paper/무포지션/잔고1,000만 확인 후 AST-Paper-Trader Disable→Stop→Enable→Start. 첫 재기동 스크립트가 프로세스 확인 패턴 오류로 Stop 직후 멈춰 약2분 정지 후 수정본으로 재개. 새 Node PID 2800, /api/status config fee0.0004·maxPositionKrw3000000·paper 확인, 10:48 KST 운영 점검 정상. 관측 작업은 건드리지 않음.
